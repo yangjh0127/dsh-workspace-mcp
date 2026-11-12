@@ -24,7 +24,7 @@ The root package includes the MCP Manager UI. Use the profile you run, such as `
 
 - Use `.dsh/mcp.yml` or `.dsh/mcp.json` in the workspace root. The plugin also reads a workspace's `.mcp.json` for compatibility. Configuration changes reload automatically.
 - Open **MCP Manager** from the main sidebar, Settings sidebar, or **Settings → Built-in plugins**. Use **Settings → General → MCP management page entries** to choose which shortcuts appear. Headless profiles use the loader and CLI.
-- **Eager** is the default and mounts servers as soon as their workspace is discovered. Session creation and resume continue while Eager servers load. A model request can use the tools that are ready when it starts. Choose **Lazy** per server to connect on demand. In Lazy mode, use `mcp_search` to discover tools, `mcp_describe` to inspect their schemas, and `mcp_call` to invoke them. Connections stay open until the session ends or the server entry is unloaded.
+- **Eager** is the default and mounts servers as soon as their workspace is discovered. Choose **Lazy** per server to connect on demand. In Lazy mode, use `mcp_search` to discover tools, `mcp_describe` to inspect their schemas, and `mcp_call` to invoke them. Connections stay open until the session ends or the server entry is unloaded.
 - Workspace tools are scoped to the session's original workspace. User and profile configuration can provide shared servers across workspaces.
 
 A `stdio` entry starts its configured command on the DSH host. Only enable servers and workspace configurations you trust.

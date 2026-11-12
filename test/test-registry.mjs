@@ -2149,13 +2149,11 @@ try {
     ctxLate.schemas.push({ name: `mcp__${effective}__ping` });
     const [onAgentCreated] = ctxLate.handlers.get("agent/created");
     const create = (agent, signal) => onAgentCreated({ agent, source: "resume", signal });
-    for (const source of ["startup", "resume"]) {
-      const agent = fakeAgent("session-late-" + source, projLate);
-      ctxLate.agentsList.push(agent);
-      await onAgentCreated({ agent, source, signal: AbortSignal.timeout(1000) });
-      assert.equal((await registryLate.serverView(projLate, "late"))?.fiberPhase, "loading",
-        source + " returns while the Eager server is still loading");
-    }
+    // 新建会话（不在启动快照里）：创建等待其可见 Eager 就绪，首条模型请求才可见工具。
+    const agentLateNew = fakeAgent("session-late-new", projLate);
+    ctxLate.agentsList.push(agentLateNew);
+    let eagerStarted = false;
+    const waiting = create(agentLateNew, AbortSignal.timeout(5000)).then(() => { eagerStarted = true; });
     const cancellation = new AbortController();
     const agentLateCancelled = fakeAgent("session-late-cancelled", projLate);
     ctxLate.agentsList.push(agentLateCancelled);
@@ -2167,6 +2165,7 @@ try {
     await create(agentLazyNew, AbortSignal.timeout(1000));
     // 启动恢复（replay）不等待：agentLate 在构造时的在线快照里，即使 fiber 仍被挂起。
     await create(agentLate, AbortSignal.timeout(1000));
+    assert.equal(eagerStarted, false, "session creation has not completed while its Eager server mounts");
     await registryLate.reconcileNow();
     const updatesBeforeSettle = updatesLate.length;
     const release = ctxLate.held[0];
@@ -2176,6 +2175,8 @@ try {
     assert.equal(after?.fiberPhase, "active");
     assert.equal(after?.toolCount, 1, "tool count is visible once the fiber settles");
     assert.equal(updatesLate.length, updatesBeforeSettle + 1, "settling after reconcile emits projectMcp/updated");
+    await waiting;
+    assert.equal(eagerStarted, true);
     await writeManagedRows(projectMcpFile(projDuplicate), [stdioRow("late")], { createIfMissing: true });
     ctxLate.agentsList.push(fakeAgent("session-duplicate", projDuplicate));
     await registryLate.reconcileNow();
@@ -2184,7 +2185,7 @@ try {
     assert.equal((await registryLate.serverView(projLate, "late"))?.effectiveServerName, effective);
     assert.deepEqual(ctxLate.mounts.map(({ serverName }) => serverName), [effective, duplicate.effectiveServerName]);
     assert.deepEqual(ctxLate.disposals, [], "a new colliding workspace does not remount the online server");
-    pass("session creation and resume return while Eager servers load, and collisions preserve existing mounts");
+    pass("model admission waits only for its Eager servers and new collisions preserve existing mounts");
   } finally {
     for (const disposer of ctxLate.disposers) {
       const cleanup = disposer();
@@ -2387,6 +2388,10 @@ try {
       userLayerPaths: { mcpYml: join(homeChain, ".dsh", "mcp.yml"), mcpJson: join(homeChain, ".dsh", "mcp.json"), profilesDir: join(homeChain, ".dsh", "profiles") }
     });
     await registryChain.reconcileNow();
+    // 先让 away 工作区被扫描（无配置行）：会话创建的 Eager 等待只查已扫描目录，
+    // 不会被后面挂起的 dispose 堵住。
+    ctxChain.agentsList.push(agentAway);
+    await registryChain.reconcileNow();
     const effective = ctxChain.mounts[0].serverName;
     ctxChain.schemas.push({ name: "mcp__" + effective + "__ping" });
     await registryChain.reconcileNow();
@@ -2402,7 +2407,6 @@ try {
     const mountsAtHold = ctxChain.mounts.length;
     ctxChain.schemas.push({ name: "mcp__" + effective + "__ping" });
     const [onAgentCreated] = ctxChain.handlers.get("agent/created");
-    ctxChain.agentsList.push(agentAway);
     const creation = onAgentCreated({ agent: agentAway, source: "startup" });
     let timer;
     try {
