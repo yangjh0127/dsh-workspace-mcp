@@ -1509,17 +1509,20 @@ export class ProjectMcpRegistry {
   private async readUserLayer(): Promise<void> {
     const paths = this.resolveUserLayerPaths();
     this.activeProfileName = await this.resolveActiveProfileName();
-    const yml = await this.readNativeRows(paths.mcpYml, "dsh-user-yml", false);
-    this.noteConfigRead();
-    const json = await readDshJsonFile(paths.mcpJson, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
     const profileYmlPath = this.activeProfileName === undefined ? null : profileMcpYmlFile(paths.profilesDir, this.activeProfileName);
     const profileJson = this.activeProfileName === undefined ? null : profileMcpJsonFile(paths.profilesDir, this.activeProfileName);
-    const profileYml = profileYmlPath === null
-      ? { rows: [] as SourcedRow[], ok: true, error: null, missing: true }
-      : await this.readNativeRows(profileYmlPath, "dsh-profile-user-yml", false);
-    const profile: JsonReadResult = profileJson === null
-      ? { rows: [], entryErrors: [] }
-      : (this.noteConfigRead(), await readDshJsonFile(profileJson, { source: "dsh-profile-user", cwdPolicy: "host", projectRoot: "" }));
+    this.noteConfigRead();
+    const emptyJson: JsonReadResult = { rows: [], entryErrors: [] };
+    const [yml, json, profileYml, profile] = await Promise.all([
+      this.readNativeRows(paths.mcpYml, "dsh-user-yml", false),
+      readDshJsonFile(paths.mcpJson, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" }),
+      profileYmlPath === null
+        ? { rows: [], ok: true, error: null, missing: true }
+        : this.readNativeRows(profileYmlPath, "dsh-profile-user-yml", false),
+      profileJson === null
+        ? emptyJson
+        : (this.noteConfigRead(), readDshJsonFile(profileJson, { source: "dsh-profile-user", cwdPolicy: "host", projectRoot: "" }))
+    ]);
     this.userLayer = {
       mcpYml: paths.mcpYml,
       mcpJson: paths.mcpJson,
@@ -1740,8 +1743,10 @@ export class ProjectMcpRegistry {
 
   /** 对账正文。成功才 emit；抛错时调用方清掉 `reconciling`，事件不发。 */
   private async reconcileAllInner(): Promise<void> {
-    const roots = await this.knownProjects();
-    const hostGlobalNames = await this.providers.globalNames().catch(() => []);
+    const [roots, hostGlobalNames] = await Promise.all([
+      this.knownProjects(),
+      this.providers.globalNames().catch(() => [])
+    ]);
     const { skip: skipReread, signature } = await this.shouldSkipConfigReread(roots, hostGlobalNames);
     if (!skipReread) {
       await this.readUserLayer();
@@ -1873,15 +1878,19 @@ export class ProjectMcpRegistry {
     // （全局一条 + 该项目一条 p<hash>_…）。
     const ymlPath = projectMcpFile(projectRoot);
     const jsonPath = projectDshJsonFile(projectRoot);
-    const yml = isSameFilePath(ymlPath, userPaths.mcpYml)
-      ? { rows: [], ok: true, error: null, missing: false }
-      : await this.readNativeRows(ymlPath, "dsh-project", hasYmlMounts);
-    const projectJson: JsonReadResult = isSameFilePath(jsonPath, userPaths.mcpJson)
-      ? { rows: [], entryErrors: [] }
-      : (this.noteConfigRead(), await readDshJsonFile(jsonPath, { source: "dsh-project-json", cwdPolicy: "project", projectRoot }));
-    const cc: JsonReadResult = mcpJsonLayerEnabled()
-      ? (this.noteConfigRead(), await readMcpJsonFile(projectMcpJsonFile(projectRoot), projectRoot))
-      : { rows: [], entryErrors: [] };
+    const ccEnabled = mcpJsonLayerEnabled();
+    const emptyJson: JsonReadResult = { rows: [], entryErrors: [] };
+    const [yml, projectJson, cc] = await Promise.all([
+      isSameFilePath(ymlPath, userPaths.mcpYml)
+        ? { rows: [], ok: true, error: null, missing: false }
+        : this.readNativeRows(ymlPath, "dsh-project", hasYmlMounts),
+      isSameFilePath(jsonPath, userPaths.mcpJson)
+        ? emptyJson
+        : (this.noteConfigRead(), readDshJsonFile(jsonPath, { source: "dsh-project-json", cwdPolicy: "project", projectRoot })),
+      ccEnabled
+        ? (this.noteConfigRead(), readMcpJsonFile(projectMcpJsonFile(projectRoot), projectRoot))
+        : emptyJson
+    ]);
     // 影子优先级：.dsh/mcp.yml > .dsh/mcp.json > .mcp.json > profile yml > profile json > 用户 yml > 用户 json。
     const merged = mergeSourcedRows([yml.rows, projectJson.rows, cc.rows, this.userLayer.profileYmlRows, this.userLayer.profileRows, this.userLayer.ymlRows, this.userLayer.jsonRows]);
     // 归因过滤：纯用户层之间的重复定义与本项目无关（否则零配置项目也会被写
@@ -1916,7 +1925,7 @@ export class ProjectMcpRegistry {
       skipJsonPartition: isSameFilePath(jsonPath, userPaths.mcpJson),
       jsonPath,
       json: projectJson,
-      ccEnabled: mcpJsonLayerEnabled(),
+      ccEnabled,
       ccPath: projectMcpJsonFile(projectRoot),
       cc
     });
