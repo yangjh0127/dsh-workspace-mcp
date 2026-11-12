@@ -1,0 +1,1179 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Per-server Lazy mode. The MCP Manager and project config support opt-in
+  discovery and invocation through three session-scoped proxies.
+  Contributed by [@yangjh0127](https://github.com/yangjh0127) in
+  [#30](https://github.com/wldxiaobai/dsh-project-mcp-manager/pull/30).
+- `projectMcp.setLoadingMode` and optional `mode` fields on drafts/views;
+  additive minor API changes require a synchronized manager/UI minor release.
+- Lazy lifecycle, two-project authorization, official naming parity and dependency
+  compatibility regression tests. See the [Gate 1 review](docs/code-review/pr30-lazy-gate1.zh.md).
+
+### Fixed
+
+- Creating a session applies tool isolation immediately and waits up to 20
+  seconds for its visible Eager servers to finish mounting, so the first model
+  request sees them; sessions restored at startup skip the wait. Newly
+  discovered workspace collisions preserve existing Eager connections.
+
+- Lazy connections activate independently on each session's first search and
+  stay open across idle periods and workspace switches.
+
+- Keep MCP servers mounted for every discovered workspace when users switch
+  sessions. Each session sees its own workspace and shared MCP tools, server
+  instructions, and resources.
+
+- Lazy cancellation now releases the final waiter's pending connection without
+  cancelling other callers. Generation shutdown is serialized with reconnects,
+  including SDK stdio negotiation, idle close, mode changes and repeated disposal.
+- Discovery has a separate 30-second timeout, and MCP client metadata uses the
+  package version instead of a stale literal.
+- Invalid disabled placeholders cannot be turned into incomplete mode-only rows;
+  Lazy standby rows are not counted as running in the workspace header.
+- The leftover idle workspace tag and its hint are removed from the management
+  page, and the enabled-but-not-started status now reads "waiting to load".
+
+### Architecture
+
+- Keep explicit SDK `@modelcontextprotocol/client@2.2.0` and environment-scrubbing
+  `@deepseek-ai/dsh-subprocess@0.2.2-rc.1` dependencies for the Lazy path. The
+  alternatives, naming-policy coupling and host-policy limitations are recorded
+  in the [design decision](docs/design/lazy-mcp.md). Dependency upgrades must pass
+  the compatibility and official public-bridge naming tests.
+
+## [0.12.0] - 2026-11-10
+
+Versioned together with `dsh-project-mcp-ui` 0.12.0. This source version and
+Git tag do not imply that either package has been published to npm.
+
+Host alignment is unchanged (dsh **0.2.2-rc.1** and later `0.2` releases).
+No loader, service method, CLI, or config-file behavior changed; the UI state
+route only gains fields.
+
+### Added
+
+- **Settings sidebar entry.** `dsh-project-mcp-ui` now also registers
+  `settings.section` and `settings.section.icon` under the same `project-mcp`
+  id, rendering the existing `McpPanel` with no extra shell. Settings now has
+  three ways into the page: the main sidebar row and page, this settings
+  section, and the restored plugins tab.
+- **Per-entry visibility.** The `mcp-project-ui` host entry exports a
+  `Config` schema with `sidebar`, `settingsSection`, and `settingsTab`
+  booleans (all default `true`, all marked `.volatile()` so the host settings
+  form serves them without a plugin remount). A **Settings → General** row
+  (`settings.general.item`, id `mcp-entries`, order 12) opens a small dialog
+  with one checkbox per entry; changes are drafted locally and written as one
+  `configForms.mutate` on **Done**, and **Cancel** discards them. All three can
+  be switched off because the General row is not one of them. Read-only pages
+  keep the checkboxes disabled with a note. The same row is also contributed to
+  the plugin manager's page for the bundle (`plugins.bundle.config`, keyed by
+  `dsh-project-mcp-manager`); both places edit one shared form.
+- **Localised README in the plugin manager.** `locale/zh.json` declares
+  `meta.detail: docs/README.zh.md` and `locale/en.json` declares
+  `meta.detail: README.md`. The plugin manager picks the file by display
+  language (`zh-CN` → `zh` → `en`), so a Chinese UI reads the Chinese README
+  and every other language falls back to English. Both locale files and both
+  READMEs are packed.
+- **Current workspace header.** The panel starts with a **Current workspace**
+  block: workspace name, full path, `N servers · M running · K waiting for a
+  session · J disabled` (non-zero parts only), and the scope note. Multiple
+  workspaces without a focus show **Current workspace not determined** instead
+  of guessing. `McpUiState.activeProject` and `activeProjectKey` carry the same
+  workspace the Add MCP dialog writes to; no service method contract changed.
+- **Workspace group markers.** The active workspace group moves to the top and
+  gets a **Current** tag; other groups whose rows are waiting for a session get
+  an **Idle** tag and "Loads when you switch to this workspace." A more
+  specific skip reason never adds the Idle tag.
+- **Back button.** The main sidebar page's title row has **Back to current
+  workspace** (`ctx.layout.selectPanel(null)`). It returns to the conversation
+  surface without changing the current session and appears only on that entry.
+
+### Changed
+
+- The browser half injects `layout` and `configForms` in addition to `slots`
+  and `locale`. Deployments without the settings domain keep the UI plugin
+  inactive, the same way a missing settings slot package already behaved.
+- Entry registrations are installed and released through disposable
+  controllers. Closing the main entry first leaves the `main` panel (if it is
+  showing the page), then releases the sidebar row and page together; the
+  settings section releases its nav row and glyph together.
+- The UI package declares `@deepseek-ai/schemastery` for the new host `Config`.
+
+### Fixed
+
+- **Workspace names avoid quadratic regex backtracking.** Display-name parsing
+  now scans trailing separators and locates the last path separator directly,
+  preserving existing names and root-path display while handling long separator
+  runs in linear time.
+- **Entry settings no longer overwrite concurrent edits.** The visibility
+  dialog (Settings → General and the plugin manager page) now keeps the
+  `revision` it read when it opened and passes it through to
+  `configForms.mutate` as the write fence; the wiring layer no longer swaps in
+  the latest revision. Only the fields the user toggled in that dialog are
+  submitted, so a stale draft cannot revert a checkbox changed in another
+  window. When the Host refuses the write, the draft is kept, the reloaded
+  revision becomes the next fence, and the dialog says that confirming again
+  writes only the fields the user changed.
+- **Workspace identity follows the host platform.** `McpUiState` now carries
+  `activeProjectKey` and every server row carries `projectKey`; both are
+  computed by the core `projectKeyOf()` (case-insensitive on Windows only). The
+  browser no longer lowercases paths or rewrites separators, so two
+  case-different POSIX workspaces stay separate in the current-workspace counts,
+  group markers, and group ordering. The package entry now also exports
+  `projectKeyOf`.
+- **Global rows no longer count as the current workspace.** `workspaceCounts()`
+  filters on `layer === "project"` instead of comparing `projectRoot` alone, so
+  user/profile rows (whose `projectRoot` is the config directory) are excluded
+  even when `DSH_HOME` or a profile directory happens to be the workspace root.
+
+## [0.11.1] - 2026-11-08
+
+Versioned together with `dsh-project-mcp-ui` 0.11.1. This source version and
+Git tag do not imply that either package has been published to npm.
+
+Host alignment is unchanged (dsh **0.2.2-rc.1** and later `0.2` releases).
+No loader, service, CLI, API route, or config-file behavior changed.
+
+### Fixed
+
+- **The settings entry is back.** 0.11.0 removed
+  **Settings → Built-in plugins → Plugin: MCP Manager** and left the left sidebar
+  row as the only way in. That broke documented paths and left the page
+  unreachable while the sidebar is collapsed to the rail, hidden on macOS, or
+  opened as a drawer on narrow layouts. 0.11.1 restores the `settings.plugins.tab`
+  registration, so both entries exist again and open the same panel.
+- The browser bundle once again declares `@deepseek-ai/dsh-client-ui-settings`
+  and `@deepseek-ai/dsh-client-ui-settings-plugins` in `dsh.client.inject`, so the
+  slot package loads before the tab registers.
+
+### Changed
+
+- The one-release deprecation notices are not coming back: the two entries are
+  now a supported, permanent arrangement. The sidebar page shows only its title;
+  the settings tab renders `McpPanel` directly. Removed keys: `entryNoticeNew` and
+  `entryNoticeOld`, plus the `McpSettingsTab` shell and the `.dsh-mcp-notice`
+  style.
+
+## [0.11.0] - 2026-11-06
+
+Versioned together with `dsh-project-mcp-ui` 0.11.0. This source version and
+Git tag do not imply that either package has been published to npm.
+
+Host alignment for dsh **0.2.2-rc.1**. v0.10.0 remains the release for
+0.2.1-rc.2 through rc.5; v0.8.2 remains the release for the dsh `0.2.0` line;
+v0.6.0 remains the release for dsh 0.1.5. No loader, service, CLI, API route, or
+config-file behavior changed.
+
+### Removed
+
+- **The settings tab is gone.** `settings.plugins.tab`, the `Plugin: MCP Manager`
+  label, the one-release migration notice on both entries, and the
+  `.dsh-mcp-entry` / `.dsh-mcp-notice` styles were deleted. The left sidebar
+  **MCP Manager** row is now the only UI entry.
+- The browser bundle no longer waits for `@deepseek-ai/dsh-client-ui-settings`
+  or `@deepseek-ai/dsh-client-ui-settings-plugins` in `dsh.client.inject`, and
+  those packages left the client devDependencies and the esbuild externals.
+
+### Changed
+
+- **Dependency floors are `^0.2.2-rc.1`.** `@deepseek-ai/dsh-mcp-client`, the UI
+  runtime dependency `@deepseek-ai/dsh-native-command`, the client
+  devDependencies, and both `engines.dsh` fields move to rc.1. cordis moves from
+  `^4.0.5` to `^4.1.0` (dsh 0.2.2 ships cordis 4.1.0, loader 1.1.0, include
+  1.1.0, timer 1.2.0, schemastery 3.19.0).
+- `pnpm-workspace.yaml`'s `minimumReleaseAgeExclude` lists the 0.2.2-rc.1
+  packages plus cordis 4.1.0 and its plugins, so the release-age policy cannot
+  silently resolve back to the 0.2.1 tuple.
+
+### Compatibility notes
+
+- The mcp-client `Config` schema is byte-identical between 0.2.1-rc.5 and
+  0.2.2-rc.1: `stdio` | `streamable-http`, reconnect cap `2147483647`, MCP SDK
+  2.2.0, same exports. Nothing in the loader needed to change.
+- `tools.restrict()` and `tools.schemas()` keep their signatures; the
+  `tools.resolve/executable` and prompt-assembly migrations in the 0.2.2 notes
+  target plugins that register tools directly, which this plugin does not.
+- `agent/created` still carries `{ agent, source, signal? }`, `session.header.cwd`
+  is still the session's original project, and `connection.fetch.register` keeps
+  `{ path, methods, requestBody, fetch }`.
+- cordis 4.1.0 still accepts `ctx.effect(execute, label)` and
+  `ctx.plugin(plugin, config)`. Loader 1.1.0 entries expose `options.config`
+  without a top-level `config` accessor; `globalNames()` and `activeProfile()`
+  already fall back to `entry.options.config`, so they keep working unchanged.
+
+See [dsh 0.2.2-rc.1 adaptation record](docs/design/adaptation-dsh-0.2.2-rc.1.md).
+
+## [0.10.0] - 2026-11-04
+
+Versioned together with `dsh-project-mcp-ui` 0.10.0. This source version and
+Git tag do not imply that either package has been published to npm.
+
+Host alignment for dsh **0.2.1-rc.5**. v0.9.0 remains the release for
+0.2.1-rc.2 through rc.4; v0.8.2 remains the release for the dsh `0.2.0` line;
+v0.6.0 remains the release for dsh 0.1.5. No loader, service, CLI, API route, or
+config-file behavior changed.
+
+### Added
+
+- **Left sidebar entry.** The UI package now registers `sidebar.panellist`
+  (icon row) and the matching `main` page under one id, `project-mcp`, so MCP
+  management opens from the left sidebar beside the shipped Plugins and task
+  panels. `order` is 10, right after Plugins.
+- **Migration notice in both entries.** The sidebar page says the settings tab
+  is temporary; the settings tab says the new entry exists and that the tab is
+  planned for removal in the next release.
+
+### Changed
+
+- **Dependency floors are `^0.2.1-rc.5`.** `@deepseek-ai/dsh-mcp-client`, the
+  UI runtime dependency `@deepseek-ai/dsh-native-command`, the client
+  devDependencies, and both `engines.dsh` fields move to rc.5. The bridge
+  schema is byte-identical to rc.2 (`stdio` | `streamable-http`, reconnect cap
+  `2147483647`, MCP SDK 2.2.0, cordis peer `~4.0.5`), so no code changed; the
+  floor moves because rc.5 client peers are exact-version rc.5 packages and a
+  rc.2–rc.4 host would otherwise mix tuples. `minimumReleaseAgeExclude` lists
+  the rc.5 packages for the same reason.
+- The browser bundle declares `@deepseek-ai/dsh-client-ui-sidebar` and
+  `@deepseek-ai/dsh-client-ui-layout` in `dsh.client.inject`. Both entries
+  render the same `McpPanel`; internal read/write logic is untouched.
+
+### Deprecated
+
+- **Settings → Built-in plugins → Plugin: MCP Manager** still opens the same
+  panel in 0.10.0 and is planned for removal in 0.11.0.
+
+## [0.9.0] - 2026-10-17
+
+Versioned together with `dsh-project-mcp-ui` 0.9.0. This source version and
+Git tag do not imply that either package has been published to npm.
+
+Host alignment for dsh **0.2.1-rc.2**. v0.8.2 remains the release for the dsh
+`0.2.0` line. v0.6.0 remains the release for dsh 0.1.5.
+
+### Changed
+
+- **`@deepseek-ai/dsh-mcp-client` floor is `^0.2.1-rc.2`.** npm semver will
+  not select `0.2.1-rc.2` from `^0.2.0-rc.2`, and the new client's cordis peer
+  is `~4.0.5`. The UI runtime dependency `@deepseek-ai/dsh-native-command` and
+  the settings-page devDependencies move to the same tuple. cordis devDependency
+  is `^4.0.5`.
+- **`engines.dsh` is `^0.2.1-rc.2`** on both packages. dsh 0.2.1 checks that
+  range before dsh peer dependencies, with prereleases included. The caret
+  upper bound is `<0.3.0-0`, so a `0.3` prerelease is not accepted.
+- Project focus and tool visibility still follow `session.header.cwd`. On dsh
+  0.2.1 that field is the session's original project and stays unchanged;
+  `working_directory` updates a separate projection and does not retarget MCP.
+- The mirrored transport set is still `stdio | streamable-http`. The published
+  client bridge is the same code as 0.2.0-rc.2; it now loads MCP client SDK
+  2.2.0. `MAX_TIMER_DELAY_MS` stays `2147483647`.
+
+### Removed
+
+- The `minimumReleaseAgeExclude` entry for `@deepseek-ai/dsh-invariants`.
+  That package is not published at `0.2.1-rc.2`. New exclude entries cover
+  cordis 4.0.5, cosmokit 1.8.6, schemastery 3.18.5, and the new
+  `dsh-credentials`, `dsh-fs`, and `dsh-working-directory` peers.
+
+See [dsh 0.2.1-rc.2 adaptation record](docs/design/adaptation-dsh-0.2.1-rc.2.md).
+
+## [0.8.2] - 2026-10-17
+
+Versioned together with `dsh-project-mcp-ui` 0.8.2. This source version and
+Git tag do not imply that either package has been published to npm.
+
+0.8.1 was an internal version, not a normal release. The notes below are the
+0.8.1 notes.
+
+### Fixed
+
+- The project watcher no longer opens the first two levels of a workspace.
+  It watches the project root and `.dsh` only (depth 1), and the allow-list
+  is those directories plus `.dsh/mcp.yml`, `.dsh/mcp.json`, and `.mcp.json`.
+  On Windows, watches on `lib/` and similar directories kept the directory
+  delete-pending, so the next build's clean failed with `ENOTEMPTY` and the
+  path could not be recreated until the host restarted.
+
+### Changed
+
+- Notes from the npm 0.8.0 web-profile check and the local artifact cleanup
+  policy now live under `docs/testing/`.
+
+## [0.8.1] - 2026-10-17
+
+Internal version. Not a normal release. The changes are recorded under
+[0.8.2](https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.8.0...v0.8.2).
+
+## [0.8.0] - 2026-10-03
+
+Versioned together with `dsh-project-mcp-ui` 0.8.0. This source version and
+Git tag do not imply that either package has been published to npm.
+
+### Fixed
+
+- Disabling the UI component or removing `connection` closes already-open SSE
+  responses and releases their update subscriptions, ping timers, and abort
+  listeners. Request abort/cancel cleanup remains idempotent.
+
+- The settings page kept showing "Starting" after the MCP server had connected,
+  until the page was closed and opened again. A mount that becomes active or
+  failed after reconcile emits `projectMcp/updated`, and the page keeps
+  re-reading while any row is still starting.
+- A non-yml row with a different name but the same command and arguments, or
+  the same URL, no longer appears as its own card. The loader never starts
+  that copy, so the card stayed on "On · waiting for a session" with no
+  covered-by note. Same-name copies still stay on the winning card as a note.
+- Project diagnostics are written under `$DSH_HOME/mcp-diag/`, not into the
+  workspace. A leftover `<projectRoot>/.dsh/.mcp-diag.json` is removed on the
+  next reconcile. `dsh-mcp status` reads the new path.
+- Opening a workspace for the first time in a running dsh process now loads
+  that directory's MCP config without a restart. Session creation is observed
+  even when the event is scoped, and live session directories are rescanned
+  every two seconds. A file-watch update can no longer block that load.
+- Deleting an MCP confirmed with "Write yml". The confirm button now says
+  Remove. Enabling or disabling a non-yml row still confirms with Write yml.
+- Profile servers were listed under User. They have their own section,
+  "profile 层：桌面端" for the `desktop` profile and "profile 层：web 端" for
+  `web`. Other profile names use that name.
+- Settings page copy uses one term per concept. The project section and the
+  save location are both called Workspace (工作区), switch states read
+  Enabled / Disabled (已启用 / 已禁用), the confirm button says Write mcp.yml,
+  and Chinese text puts a space around Latin words. The English tab title is
+  "Plugin: MCP Manager", matching the Chinese one.
+- User and profile file paths are shown from `~` instead of the drive letter.
+  Project paths stay absolute. The command line on a card is unchanged.
+- A card that says it is on and waiting for a session shows a white switch.
+  A card that is actually running keeps the green switch.
+
+### Added
+
+- Settings page guide (`docs/guide/settings-ui.md`, Chinese `settings-ui.zh.md`),
+  linked from both READMEs. The README, layer, format, CLI, and query-surface
+  docs no longer describe the plugin as UI-less, and count seven layers.
+- The Add MCP dialog can fill its fields from a JSON or YAML server on the
+  clipboard (`mcpServers`, `servers`, one entry, or a managed yml row). The
+  save location stays whatever is selected in the dialog. A clipboard with
+  several servers fills the first and says how many were left out.
+- Profile-layer native managed block `~/.dsh/profiles/<name>/mcp.yml`
+  (source `dsh-profile-user-yml`), read ahead of that profile's `mcp.json`.
+  Layer precedence is now `.dsh/mcp.yml` > `.dsh/mcp.json` > `.mcp.json` >
+  profile yml > profile json > `~/.dsh/mcp.yml` > `~/.dsh/mcp.json`.
+  `dsh-mcp --scope profile` writes the yml by default (`--format json` keeps
+  writing `mcp.json`); `remove --scope profile` without `--format` checks the
+  yml first, then the json.
+- Editing a legacy `.mcp.json` row writes the project's managed `.dsh/mcp.yml`
+  (the original file stays unchanged).
+- Companion settings package `dsh-project-mcp-ui` (`packages/ui`): lists every
+  readable server, opens the managed yml for the user layer, the active profile,
+  or a project, and toggles or removes servers and individual tools. A non-yml
+  source asks before a higher-priority yml row is written. Disable the
+  `mcp-project-ui` component in the manager bundle to hide the page.
+- The settings page adds a server from a form. Confirm writes one managed
+  `mcp.yml` row for the current workspace, the user layer, or the active
+  profile. MCP config stays beside that button as a file menu.
+
+### Changed
+
+- The root `dsh-project-mcp-manager` is the default bundle for both the core
+  (`mcp-project`) and UI (`mcp-project-ui`) rows, enabled by default. One
+  manager install supplies the UI through a same-exact-version dependency;
+  the UI retains its exact manager peer but no longer declares a standalone
+  `dsh.bundle`. The packages must be versioned and published together.
+- The UI can be disabled individually through the manager bundle's component
+  controls without stopping the core. In headless mode it has no browser
+  page; without `connection` it registers no routes.
+  Connection-scoped integration waits independently of the core loader,
+  registers on service arrival, and cleans up on disposal.
+- Root `pnpm run build` now builds core first, then the UI host code and
+  browser bundle. Local development needs only the root manager link.
+- Migration from a separately installed UI is explicit: install the manager
+  bundle first, remove `dsh-project-mcp-ui` from the profile bundle selection,
+  then optionally remove the direct UI dependency with `dsh plugin remove`.
+  The manager's UI dependency remains; old selection and dependency cleanup
+  are not promised to happen automatically.
+- MCP settings cards say whether a server is running ("Running · N tools") or
+  only switched on ("On · waiting for a session"). Each card shows its source
+  file, and a warning badge when an edit must take over into the managed yml.
+  A skip reason is a line on the card. The page intro keeps one sentence; the
+  write-policy note sits on a help icon.
+- The settings list counts one card per server the loader will run. A same-name
+  copy in a lower-priority file stays on that card as a covered-by note. A
+  non-yml row that loses only because the command and arguments, or the URL,
+  already belong to a higher-priority row is left off the list.
+
+## [0.7.2] - 2026-10-02
+
+The query surface becomes push-based for the companion UI. Mount behavior and
+the host range are unchanged (dsh `0.2.0` tuple, from `0.2.0-rc.2`).
+
+### Added
+
+- After each successful reconcile, emit the cordis event `projectMcp/updated`
+  (no payload). Listeners read `snapshot()` and diff themselves; this package
+  does not open a browser SSE channel. A listener that throws is logged and
+  does not fail the reconcile.
+- Re-export the query-surface view types from the package entry
+  (`ProjectFileState`, `McpServerRuntimeView`, `McpServerView`, `McpRowSource`,
+  and the types those views name). The build now emits `.d.ts` (`declaration`
+  was off, so `lib/*.d.ts` did not exist), and `package.json` points `types`
+  at `lib/index.d.ts`. The exports map still blocks deep imports of `lib/`.
+
+### Changed
+
+- `projectMcp` methods, the `projectMcp/updated` event, and those exported view
+  types are a semantic-version contract for the companion UI. That package
+  should list `dsh-project-mcp-manager` as an exact `peerDependency` (same
+  version, no range). See [query surface](docs/guide/service.md).
+
+## [0.7.1] - 2026-09-30
+
+Patch release: the findings of the
+[feat/adapt-dsh-0.2.0-rc.2 code review](docs/code-review/review-feat-adapt-dsh-0.2.0-rc.2.zh.md).
+The host range is unchanged (dsh `0.2.0` tuple, from `0.2.0-rc.2`).
+
+### Fixed
+
+- Background enqueues no longer swallow their failures silently. The
+  constructor's `agent/created` / `agent/disposed` / hot-reload sweeps, the
+  file-event `kick`, the grace unmount timer and `kickSweep` all go through a
+  new `schedule()`, which keeps the `enqueue()` result and logs
+  `项目 MCP 后台任务失败：…` instead of discarding it (Sonar S9383).
+
+### Changed
+
+- `enqueue()` accepts `() => T | Promise<T>`, so `serverView()` and `snapshot()`
+  drop the `async` that only existed to satisfy the old signature (Sonar S7503).
+- `trackMount`'s fiber-settle callbacks call a new `enqueueDiag()` helper: the
+  diagnostic write still queues on the reconcile chain, without a nested promise
+  (Sonar S9381).
+- Config-fingerprint `stat` calls are issued concurrently via `Promise.all`; the
+  signature still lists the sorted paths in order (Sonar S9382).
+
+### Removed
+
+- Dead export `DEFAULT_MAX_INSTRUCTION_BYTES`. Nothing referenced it, and a local
+  copy of the upstream default could drift from `dsh-mcp-client`.
+
+### Added
+
+- Regression tests: `agent/created` with `source: "resume"` mounts the session
+  project and applies the session deny; `planProjectChanges` remounts on a
+  connection-field change (`maxInstructionBytes`) while a `tools`-only edit keeps
+  the fiber.
+
+## [0.7.0] - 2026-09-30
+
+Host alignment for dsh **0.2.0-rc.2**. v0.6.0 remains the release for dsh
+0.1.5. Official dsh still does not discover per-project MCP files, isolate
+tools by session cwd, or ship an MCP-specific CLI — those stay here.
+
+### Changed
+
+- **`@deepseek-ai/dsh-mcp-client` floor is `^0.2.0-rc.2`.** npm semver will
+  not resolve a `0.2.0-rc.*` prerelease from `^0.1.5-rc.1`. Dev dependency
+  `@deepseek-ai/cordis` moves `^4.0.2` → `^4.0.4` to match the host peer.
+  pnpm 12 extended `minimumReleaseAgeExclude` for the new `0.2.0-rc.2` peers.
+- Drop the `agent/session-start` listener. dsh 0.2 removed that event;
+  `agent/created` now carries `source: startup|resume|clear|compact` and
+  covers the same edges. The constructor `liveAgents()` sweep is unchanged.
+- Document the support boundary against official profile patches, profile
+  HMR, `plugin_manager`, and `mcp-resources`.
+
+### Added
+
+- Optional `maxInstructionBytes` (integer ≥ 1) is passed through on both
+  transports, in the JSON dialect, and in `dsh-mcp` views. Omitting it does
+  not write the key, so the official default (32768) stays upstream.
+  Oversized server instructions fail that connection inside the official
+  client; this plugin does not add a CLI flag for the field.
+
+### Documentation
+
+- [dsh 0.2.0-rc.2 adaptation record](docs/design/adaptation-dsh-0.2.0-rc.2.md).
+- Format guides note the instruction limit and the official stdio env scrub
+  (ambient names matching `KEY|PASSWORD|SECRET|TOKEN` and ambient `DSH_*`
+  are dropped; values this plugin expands into `env` / `headers` are still
+  explicit config and are kept).
+
+## [0.6.0] - 2026-09-13
+
+Runtime robustness and JSON interop. **On-demand project mounts (B1) are a
+semantic change**: inactive projects no longer keep stdio children resident.
+VS Code `.vscode/mcp.json` (C3) is not in this release.
+
+### Added
+
+- `SUPPORTED_MCP_TRANSPORTS` mirrors `@deepseek-ai/dsh-mcp-client` 0.1.5-rc.1
+  (`stdio` | `streamable-http`). Schema, CLI `--transport`, JSON `type`
+  mapping and error copy all derive from it; unknown values fail locally
+  instead of reaching `ctx.plugin`.
+- Actionable diagnostics for the **MCP SSE endpoint transport** (`type: "sse"`
+  / `--transport sse`): the error names two fixes (change `type` to `"http"`,
+  or drop `type` and keep `url`) and does not silently fall back.
+- JSON dialect accepts Gemini's `httpUrl` (explicit streamable-http) and the
+  native `transport` key. Conflicting `url`/`httpUrl` or `transport`/`type`
+  pairs fail per entry. Bare `url` remains Streamable HTTP here (the opposite
+  of Gemini CLI) and is documented as such.
+- Detect `@wingsky-1/dsh-mcp-manager`'s `{version, servers}` storage at
+  `.dsh/mcp.json` and `~/.dsh/dsh-mcp.json`, write a diagnostic instead of
+  treating it as a silent empty layer, and document coexistence. The user-layer
+  watcher also watches `$DSH_HOME/dsh-mcp.json` so creating the other plugin's
+  file diagnoses it without waiting for an unrelated reconcile. A
+  `dsh-mcp.json` that already uses this plugin's `mcpServers` dialect is still
+  not loaded, and hints to move the object into `mcp.json`.
+- Diagnostic files are `{ summary?, events }` (legacy arrays still parse as
+  `events`). After each reconcile the `summary` records catalog row/mount
+  counts (`rows` from `lastScanDesired`, not the live mount map), skip
+  reasons, `idle` names and unhealthy names (`give-up` is unhealthy).
+  `dsh-mcp status` prints layer row counts plus that summary without connecting
+  to a running host. `--scope project|user|profile` filters layers and which
+  diagnostic file is printed (`profile` lists profile json layers; `--profile`
+  narrows to one name). Idle rows print as not-mounted rather than unhealthy.
+- `dsh-mcp import --from <file|->` copies `{"mcpServers":{...}}` into a native
+  yml or JSON file. Same-name keys are skipped unless `--overwrite`, and that
+  decision runs inside the file lock (matching `add`). `--dry-run` previews
+  shadow conflicts without writing. VS Code `servers` objects and bare
+  entries/arrays are rejected.
+- Connection health remount: after **the current fiber generation** has
+  exposed tools, a later `mcpToolCount === 0` that lasts past the backoff
+  window triggers unmount-then-mount. A single 0-tool inspect (`list_changed`
+  flicker) does not remount. A new fiber's first connect window is left to the
+  official client's reconnect. `tools > 0` resets `remountCount` and `givenUp`
+  (consecutive failures, not a lifetime quota; 3 consecutive deaths without
+  recovery → `give-up`). `disabled: true` / `enabled: false` rows are never
+  revived. Unchanged config fingerprints (`mtimeMs+size`, plus the active
+  profile name and sorted host global names) skip file rereads but still run
+  remount, deny sweep and diag summaries.
+- Per-server `tools.allow` / `tools.deny` (full glob; deny wins). JSON also
+  maps `includeTools` / `excludeTools`; DSH `tools.*` keys win. Patterns are
+  stripped before `ctx.plugin` and expanded to registered tool names only.
+  `patchRowToView` / `dsh-mcp get` / `list` expose the pattern text. Changing
+  only `tools.*` updates `tools.restrict` without tearing down the connection.
+- Tool-budget guardrail: after inspect, each active effective name is
+  measured via `ctx.tools.schemas()` (`schemaToolId`: `name` then `id`, shared
+  with deny expansion). Crossing `DSH_MCP_TOOL_BUDGET_WARN` (default 200 tools
+  / 256KiB) warns once per crossing and records `summary.toolBudget`; dropping
+  back under the threshold clears the gate. Tools are never clipped.
+- Unstable `ctx.provide("projectMcp", { snapshot, serverView, globalState,
+  reload })` query surface so other plugins can read mount state without
+  opening diagnostic files. `snapshot` / `serverView` / `globalState` enqueue
+  without running reconcile and assemble from the last scan's in-memory
+  catalog; `reload` is one `reconcileAll`. `serverView` is typed as
+  `McpServerRuntimeView`.
+- On-demand project mounts: scan and effective names stay full-catalog;
+  fibers are created only for projects with a live session or the process
+  cwd. After the last session leaves (and the project is not cwd) servers
+  unload following a 5 minute grace; the project entry and watcher remain,
+  and the row is recorded as `skipReason: "idle"` in `summary.idle` (not
+  `unhealthy`; more specific skips such as `env-missing` are preserved).
+  User-layer globals stay host-wide.
+
+- `package.json` discovery fields: `repository`, `bugs`, and `homepage` point at
+  https://github.com/wldxiaobai/dsh-project-mcp-manager so npm and GitHub can
+  surface the source, issues, and README.
+
+### Changed
+
+- Documented compatibility with dsh **0.1.5-rc.2**
+  (`docs/design/adaptation-dsh-0.1.5-rc2.md`). Official rc.2 is UI-only relative
+  to rc.1; `dsh-mcp-client` / `dsh-tools` `lib/` are byte-identical, so the
+  existing `^0.1.5-rc.1` range already covers the new host. No runtime change.
+
+### Fixed
+
+- JSON entries that give both `command` and `url`/`httpUrl` without
+  `type`/`transport` fail per entry instead of silently loading as stdio.
+- Transport alias lookup uses `Object.hasOwn` on a null-prototype map, so
+  values like `toString` fail as unknown transports instead of hitting
+  `Object.prototype`.
+- Illegal `tools.allow` / `tools.deny` globs (for example `[z-a]`) warn
+  once per entry instead of silently never matching.
+- Diagnostic file read-modify-write uses the same per-path lock as config
+  writes, so a `kind:active` event and the post-reconcile `summary` cannot
+  clobber each other. Lock timeout or write failure logs a warning instead
+  of dropping the summary silently.
+- Config fingerprints reuse the signature from the skip check instead of
+  statting files twice. Per-project `idleSince` / `lastScanDesired` /
+  `lastScanFiles` / `warnGates` tables drop keys that are no longer known.
+
+### Documentation
+
+- Full-id `tools.*` globs must use the effective server name after a project
+  row is renamed. `dsh-mcp add` has no `--allow` / `--deny`; write the file
+  or use `import`.
+
+## [0.4.3] - 2026-09-10
+
+Host-alignment release for dsh 0.1.5-rc.1. **No user-visible behaviour
+changes** — configuration format, mount semantics, deny isolation and CLI
+output are unchanged. The published 0.4.2 range could not resolve the
+host's prerelease client.
+
+### Changed
+
+- **Align `@deepseek-ai/dsh-mcp-client` with dsh 0.1.5-rc.1.** Specifier
+  `^0.1.2-rc.1` cannot resolve a `0.1.5-rc.*` prerelease (npm semver keeps
+  prereleases on the same major.minor.patch tuple), so the plugin was still
+  loading its own 0.1.2-rc.1 copy and 0.1.2-rc.1 peers inside a 0.1.5-rc.1
+  host. The range is now `^0.1.5-rc.1`. pnpm 12 wrote
+  `pnpm-workspace.yaml` `minimumReleaseAgeExclude` for the new rc peers so
+  the supply-chain age gate does not block them.
+
+## [0.4.2] - 2026-09-10
+
+Code-quality release: clears all 15 findings that held the PR #7 Sonar gate at
+"Reliability Rating on New Code = D". **No user-visible behaviour changes** —
+every fix is either an explicit restatement of what the code already did, or an
+internal decomposition.
+
+### Fixed
+
+- **Every string sort now passes an explicit comparator.** New
+  `byCodeUnit(a, b)` in `src/model.ts` — UTF-16 code-unit order, byte-identical
+  to `Array.prototype.sort`'s default and deliberately *not* locale collation
+  (`localeCompare` would let the host's locale decide the order of wire-visible
+  sequences: diagnostic and snapshot key sets, warning-gate signatures, `list`
+  output). Applied at all 15 call sites across `src/registry.ts`, `src/cli.ts`
+  and the test suite; ordering is unchanged, so no expectations moved.
+
+### Changed
+
+- **Internal decomposition of `scanProject`** (cognitive-complexity finding):
+  the duplicate-service shadow warning with its change gate moved into
+  `warnIdentityShadows`, and the scan-diagnostic payload into a pure
+  `buildScanDiag` that returns `null` for a clean, config-free project. The
+  zero-config-no-trace rule and every warning/diagnostic set are identical.
+- `collectLayers` pushes its three trailing layers in a single call (left-to-right
+  evaluation keeps the layer precedence unchanged), and one test helper block lost
+  its redundant braces.
+- **Lockfile metadata**: `pnpm-lock.yaml` now records the `@deepseek-ai/cordis`
+  specifier `^4.0.2` that `package.json` has declared since v0.4.1 (resolved
+  version was already `4.0.2`); `pnpm` no longer demands a re-lock on every run.
+
+## [0.4.1] - 2026-09-10
+
+Follow-up on the code review of every TypeScript change since v0.3.1
+(`docs/code-review/ts-review-since-v0.3.1.zh.md`). No configuration file format
+changes; the only observable output change is that CLI-written JSON entries now
+carry an explicit `type`.
+
+### Fixed
+
+- **Project-side suppression no longer denies a project its own tools.** A
+  `disabled: true` placeholder in a user-layer file, or a user-layer row refused
+  because a host global patch row already holds the name, used to enter the
+  project's suppression set anyway. Since neither produces a global instance, the
+  `mcp__<name>__*` deny prefix hit the project's own server (whose effective name
+  was never renamed) or the host patch instance — silently, with the snapshot
+  still reporting `fiberPhase: "active"` and no `skipReason`. The user-layer merge
+  and the host-taken name set are now computed before the project loop, so
+  suppression only ever contains names that really mount globally, and the sweep
+  additionally guards on a live global instance.
+- **`$DSH_HOME` is honoured everywhere.** The user layer (`mcp.yml`, `mcp.json`,
+  `profiles/<name>/mcp.json`), the global diagnostics file and every CLI
+  read/write path resolve the dsh home through the new `src/dsh-paths.ts`
+  (`dshHomeDir` / `dshHomeFor`). Previously they hard-coded `homedir()/.dsh`, so a
+  relocated dsh home made the whole user layer disappear without a word (a
+  missing file is a legitimate zero-config state). Injected paths
+  (`userLayerPaths`, CLI `deps.home`) still win over the environment variable.
+- **`remove` explains a cross-dialect takeover.** Removing a name that exists in
+  both `mcp.yml` and `mcp.json` still deletes the first hit only, but now prints
+  which file's same-named definition will take over as a result.
+- **Malformed `mcpServers` entries survive a write.** `readJsonServers` and
+  `updateJsonServers` no longer drop non-object entries, so a hand-written
+  `"legacy": "node x.js"` is not silently deleted by an unrelated `add`/`remove`;
+  the name it holds is visible to duplicate detection and can be cleared by
+  `dsh-mcp remove legacy`.
+- **The yml write path is a lock-held read-modify-write.** The new
+  `updateManagedRows` replaces the previous "read outside the lock, replace inside
+  it" shape, so two concurrent `add`s cannot lose each other's row. `EACCES` and a
+  corrupt managed block are no longer swallowed as "missing file":
+  `createIfMissing` now only accepts `ENOENT`.
+- **`DSH_MCP_PROFILE` is validated before it becomes a path.** A value such as
+  `../../somewhere` used to be joined straight into the profiles directory and
+  read from outside it. Invalid names (anything not matching
+  `^[A-Za-z0-9][A-Za-z0-9._-]*$`, plus an explicit `.` / `..`) now degrade to
+  "unresolvable" — the profile layer is skipped — and warn once.
+- `serverView` reports user-layer rows with a `global` scope and the layer file
+  path instead of `workspace` + project root, matching the snapshot partitions.
+
+### Changed
+
+- **Shadow diagnostics are attributed to the layer that owns the conflict.**
+  `IdentityShadow` carries the loser's and winner's source, and a new
+  `shadowedGlobal` bucket records same-name shadowing between user layers (which
+  previously had no visibility at all). Conflicts confined to the user layer are
+  reported once globally, in `<dshHome>/.mcp-diag.json`; the per-project pass only
+  keeps entries where at least one side is a project-layer row, so a zero-config
+  project is no longer given a `.dsh/.mcp-diag.json` because two user-layer files
+  disagree.
+- **Repeat warnings are gated on change.** File-level errors, bad entries and the
+  `name-taken` set now warn only when the set itself changes, instead of once per
+  reconcile per project. `skipReason` is still written every round, so the
+  snapshot keeps reporting the cause.
+- The `name-taken` warning says "host global patch row (bundle layer or profile
+  patch layer)", matching what `globalNames()` actually collects.
+- CLI-written JSON entries include an explicit `type` (`stdio` / `http`) so other
+  tools that require the key can consume the file; this plugin's own reader still
+  infers it.
+- `add` now reports, after a successful write, that the new row will not mount
+  when a higher-priority layer shadows it (by name or as the same service), and
+  notes when the other dialect file in the same scope also holds definitions.
+- Non-`ENOENT` JSON read failures carry their errno code (`读取失败（EACCES）`);
+  the code never contains file content.
+- `rowNameOf` moved to `src/model.ts` and is shared by the loader and the CLI:
+  the managed row id wins over `config.serverName`. The CLI previously used the
+  reverse precedence, so a row whose id and `config.serverName` disagreed could
+  not be removed by the name the loader actually mounted.
+- `docs/guide/layers.md` / `.zh.md` document the legacy `.mcp.json` behavior
+  changes introduced in v0.4.0 (an explicit entry `cwd` now applies, the DSH
+  passthrough keys apply, and `disabled: true` holds the name instead of being a
+  silent skip); `docs/guide/cli.md` / `.zh.md` note that `-f` and `-p` are
+  reserved short flags.
+- Wire note for snapshot consumers (a v0.4.0 change, documented here): in the
+  `snapshot()` partitions of the global layers, `project` now carries the
+  directory of the layer file itself — the dsh home for `mcp.yml` / `mcp.json`,
+  `profiles/<name>` for a profile file — where v0.3.1 reported the parent of
+  `.dsh` (the home directory). Consumers such as `dsh-skill-mcp-panel` should
+  read it as "the layer's own directory", not as a workspace root.
+
+### Changed (0.4.0 documentation and cleanup, previously unreleased)
+
+- Documentation restructured: the feature write-ups moved out of the READMEs
+  into `docs/guide/` as English/Chinese pairs — `format.md`/`.zh.md` (native
+  YAML managed block, JSON dialect, divergences from the cordis dialect),
+  `layers.md`/`.zh.md` (six-layer sources, shadow priority, global vs project
+  mounting, legacy Claude Code layer), `env-expansion.md`/`.zh.md` (`${VAR}`
+  expansion) and `cli.md`/`.zh.md` (`dsh-mcp`); release notes live in
+  `docs/releases/v<version>.md`, the adaptation and proposal records in
+  `docs/design/`. `README.md` and `docs/README.zh.md` keep only the
+  introduction, installation/build, how it works and the security boundary,
+  each linking to the documentation in its own language; every cross-document
+  link, the `AGENTS.md` directory listing and the `src/index.ts` header comment
+  follow the new layout.
+- Internal cleanup for the SonarCloud new-code review, with no behavior change:
+  test fixtures drop their world-writable-path literals (`/tmp/…`; the analyzer
+  graded one as a security vulnerability and failed the quality gate) and every
+  hand-rolled `sort()` comparator across `src/` and `test/` gives way to the
+  default code-unit ordering. Nested ternaries and a nested template literal in
+  `cli.ts` / `json-file.ts` become explicit statements, adjacent `Array#push()`
+  calls merge into one, `String#replace(/\\/g, …)` becomes `String#replaceAll`,
+  and the three over-complex functions are split — `cmdRemove`
+  (→ `removeFromTarget`), `ProjectMcpRegistry.mountServer`
+  (→ `buildServerConfig` + `trackMount`) and `sweepRestrictions`
+  (→ `activeMountGroups` + `registeredToolIds` + `expandToToolNames`).
+
+## [0.4.0] - 2026-09-09
+
+### Added
+
+- **DSH-native JSON configuration** in the ecosystem-standard
+  `{"mcpServers": { … }}` dialect (Cursor / Claude Code shape) at
+  `<projectRoot>/.dsh/mcp.json`, `~/.dsh/mcp.json` and
+  `~/.dsh/profiles/<name>/mcp.json`. Entries accept `command`/`args`/`env`/`cwd`,
+  `url`/`headers`, optional `type` (`stdio`|`http`|`streamable-http`; `sse`
+  rejected per entry), the DSH passthrough keys `toolCallTimeoutMs` /
+  `failOnStartupError` / `reconnect`, `enabled: false` (silent skip, does not
+  hold the name) and `disabled: true` (holds the name, not mounted), plus
+  `${VAR}` interpolation at mount time.
+- `dsh-mcp --format yml|json` with the `DSH_MCP_CLI_FORMAT` default
+  (`yml`|`json`, defaults to `yml`); `--scope profile --profile <name>` writes
+  `~/.dsh/profiles/<name>/mcp.json` (JSON only); `remove` searches the yml then
+  the json file. The JSON file is CLI-owned: writes preserve other top-level
+  keys and key order, refuse to overwrite an unparsable file, and run inside the
+  existing lock + atomic write.
+- `DSH_MCP_PROFILE` overrides the profile name used to locate
+  `~/.dsh/profiles/<name>/mcp.json`; otherwise it is derived from the loader
+  root include's `config.path` / `ctx.baseUrl`, and the layer is skipped when it
+  cannot be resolved.
+- `skipReason: "name-taken"` when a user-layer row collides with a
+  profile patch-row global server (the row is skipped, not renamed).
+
+### Changed
+
+- **BREAKING** — user layers are now mounted **globally**: one host-wide
+  `mcp-client` instance per row instead of one per known project. They are
+  visible to every session and no longer take part in per-project visibility.
+  A project's own row (same name, normalized name, or service identity) now
+  suppresses the global server **for that project's sessions only** (per-session
+  `tools.restrict`), while the global instance stays mounted.
+- **BREAKING** — source/layer names are DSH-native:
+  `yml` → `dsh-project`, `user-yml` → `dsh-user-yml`, plus new
+  `dsh-project-json`, `dsh-profile-user`, `dsh-user`; the legacy Claude Code
+  project file keeps its `cc-project` name. Diagnostics, snapshots and CLI
+  labels report the new names.
+- Layer precedence (first wins, per row) is now
+  `.dsh/mcp.yml` > `.dsh/mcp.json` > `.mcp.json` > profile json > `~/.dsh/mcp.yml`
+  > `~/.dsh/mcp.json`. Project rows keep the `p<hash>_` rename on conflicts;
+  global rows never rename.
+- User-layer diagnostics moved to `$DSH_HOME/.mcp-diag.json` (project
+  diagnostics stay at `<projectRoot>/.dsh/.mcp-diag.json`).
+
+### Removed
+
+- **BREAKING** — `~/.claude.json` is no longer read at all. The cc-user layer,
+  `DSH_MCP_READ_CLAUDE_USER`, `DSH_MCP_IGNORE_CLAUDE_JSON`, the
+  `mcpServers`-subtree content hash gate and `canonicalJsonString` are gone.
+  Migrate those rows to `~/.dsh/mcp.json` or
+  `~/.dsh/profiles/<name>/mcp.json`.
+- `DSH_MCP_IGNORE_MCP_JSON` still disables the legacy project `.mcp.json` layer
+  only.
+
+### Fixed
+
+- `npm run build` now clears `lib/` before compiling, so modules deleted from
+  `src/` no longer linger as stale build output.
+
+### Dependencies
+
+- `@deepseek-ai/dsh-mcp-client` `^0.1.1-rc.2` → `^0.1.2-rc.1`: the old
+  prerelease range never resolves past the 0.1.1-rc.* line (npm semver requires
+  a matching major.minor.patch tuple for prerelease candidates), so the plugin
+  loaded its own 0.1.1-rc.2 copy plus 0.1.1-rc.2 peers inside a 0.1.2-rc.1 host.
+  It now resolves 0.1.2-rc.1 with the same peers as the host
+  (`dsh-scope` replaces `dsh-invariants`).
+- Dev dependency `@deepseek-ai/cordis` `^4.0.1` → `^4.0.2` (types only) to
+  match the host.
+- Package manager is now pnpm: `pnpm-lock.yaml` is committed and the stale
+  `package-lock.json` (still pinned at v0.1.1) is removed;
+  `package.json` declares `packageManager: pnpm@12.3.4`. Build/test docs use
+  `pnpm install`.
+
+## [0.3.1] - 2026-09-04
+
+### Fixed
+
+- The one-shot `DSH_MCP_READ_CLAUDE_USER` / `DSH_MCP_IGNORE_CLAUDE_JSON`
+  conflict warning now re-arms when the conflict clears by unsetting the
+  legacy switch (the documented remedy). Previously the latch only reset on
+  the path where the opt-in itself was removed, so a second conflict went
+  silent.
+- Identity dedup warnings (`跳过重复服务定义 "x"`) now use a per-project
+  shadow-set signature gate: they fire when the set of shadowed rows changes,
+  not on every reconcile. Previously any file event caused one warning per
+  project per shadowed row per reconcile cycle.
+- `dsh-mcp list`/`get` now annotate rows dropped by the registry's
+  cross-layer dedup (normalized-name or service identity, not just exact
+  name), by running `mergeSourcedRows` over the same four layers — the CLI
+  view and what actually mounts no longer disagree.
+- `serverView()` no longer hardwires the mount-ownership flag: `fiberPhase`
+  and `toolCount` now require the located row's source to own the mounted
+  instance (same rule as the partition view), so a row that does not back the
+  live mount no longer borrows the winner's phase and tool count.
+
+### Changed
+
+- The identity-dedup warning now carries the remedy ("确属不同服务器请改名或
+  调整命令与参数"), and both READMEs document the two identity-key caveats
+  that used to be implicit: comparison runs on raw config strings **before**
+  `${VAR}` expansion, and `env`/`headers`/`cwd` are not part of the key.
+- Legacy `DSH_MCP_IGNORE_CLAUDE_JSON` now has an explicit removal anchor
+  (`TODO(v0.4)` at its definition site).
+
+## [0.3.0] - 2026-09-03
+
+### Changed
+
+- **BREAKING** — `~/.claude.json` top-level `mcpServers` (the CC user layer) is
+  no longer read by default. It is machine-wide foreign state, and mounting it
+  unconditionally fanned every such server into every known project as its own
+  process (a zero-config directory silently spawning another workspace's
+  servers). Opt in with `DSH_MCP_READ_CLAUDE_USER=1`. The legacy
+  `DSH_MCP_IGNORE_CLAUDE_JSON=1` survives one release as a force-off override:
+  when both are set the ignore switch wins, with a one-shot warning (the
+  legacy switch will be removed later).
+- `mergeSourcedRows` now dedups same-service rows across layers by priority,
+  not just by exact name: three first-come-first-served shadow keys — exact
+  `serverName`, normalized name (lowercase, non-alphanumerics stripped, so
+  `unityMCP` and `unity-mcp` are one service), and service identity (`stdio`
+  command + args, path-case-insensitive on Windows; `streamable-http` url).
+  Rows without a command/url claim no identity key (`node a.js` vs
+  `node b.js` stay distinct); `disabled` placeholder rows hold all three keys
+  without mounting. Drops are visible: `shadowedIdentity` in the scan
+  diagnostics plus a host-log warning per row.
+
+### Added
+
+- `DSH_MCP_IGNORE_MCP_JSON=1` turns the project `.mcp.json` (CC project layer)
+  off wholesale — reading, watching, snapshot partitions and CLI views all
+  honor it. The layer itself stays on by default as an in-repo declaration.
+- When the CC user layer is on, the host logs a one-time fan-out notice
+  ("N servers will join M known projects") with the way back (unset the opt-in
+  or shadow per project with a `disabled` placeholder row).
+- Truth-table tests for the new layer predicates, `mergeSourcedRows` dedup
+  unit cases (0.1–0.7), and registry scenarios 25–28 plus CLI scenarios 12–13
+  covering the three switches, the conflict arbitration and the incident
+  replay (yml twin wins, foreign duplicate stays unmounted, others still fan).
+
+### Fixed
+
+- A project whose mounts all come from the user layer no longer writes false
+  `ENOENT` scan diagnostics when `<projectRoot>/.dsh/mcp.yml` is absent — the
+  missing-file scan error now only counts project-`yml` live mounts
+  (previously `servers.size` counted every source).
+
+## [0.2.1] - 2026-09-01
+
+### Added
+
+- CC entries with `"disabled": true` are treated exactly like `"enabled": false`
+  — skipped silently, and (unlike a native-yml `disabled: true` row) without
+  occupying the name in the shadow chain.
+- `${VAR}` references in stdio `cwd` are now expanded like every other string
+  field, and a `url` containing a reference passes the pre-mount schema in any
+  position — including the host part (`https://${HOST}/mcp`); validity is
+  judged only on the expanded value (`env-invalid` skip when it fails).
+- Registry scenarios for the post-release fixes (project-vs-user empty `cwd`,
+  exact-config-file watcher kicks) and CLI tests for the
+  `DSH_MCP_IGNORE_CLAUDE_JSON` listing gate and real project-root fallback.
+
+### Changed
+
+- The user-layer watcher watches the two exact file paths `~/.dsh/mcp.yml` and
+  `~/.claude.json` instead of the `~/.dsh` directory, and `~/.claude.json`
+  events are arbitrated by the canonical-JSON content hash alone — the
+  size/mtime fast path is gone, since same-instant, same-length rewrites with
+  different content must not be swallowed.
+- Snapshot/row views keep `fiberPhase` on the strict mount-lifecycle vocabulary
+  (`pending` for a row that never mounted) and report the concrete reason on a
+  separate `skipReason` field (`env-missing` / `env-invalid` / `config-invalid`
+  / `plugin-throw`).
+- Dead export `ENV_REF_RE` removed from `src/model.ts` (superseded by the
+  embedded-reference scan).
+
+### Fixed
+
+- An empty stdio `cwd` now resolves **per source**: project-layer rows
+  (`.dsh/mcp.yml`, `.mcp.json`) get the project root, while user-layer rows
+  (`~/.dsh/mcp.yml`, `~/.claude.json`) keep inheriting the dsh host's working
+  directory — previously every empty `cwd` was resolved against the project
+  root of whichever project mounted the row.
+- The project watcher kick now matches the exact config-file paths of known
+  project roots; a stray `<root>/**/.dsh/mcp.yml` deeper in the tree no longer
+  triggers a reconciliation.
+- `.dsh/.mcp-diag.json` is written atomically (temp file + rename), so
+  concurrent readers (snapshot tooling, tests) can no longer observe
+  half-written JSON; stale skip-reason marks for deleted unmounted rows are
+  pruned during reconciliation.
+
+## [0.2.0] - 2026-09-01
+
+### Added
+
+- Claude Code read-only compatibility layer (`src/cc-file.ts`): the plugin now
+  loads `<projectRoot>/.mcp.json` and the **top-level `mcpServers` allowlist** of
+  `~/.claude.json` (CC's monolithic state file — nothing else in it is read, written,
+  logged, or echoed). Shadow priority: project `.dsh/mcp.yml` > project `.mcp.json` >
+  `~/.dsh/mcp.yml` > `~/.claude.json`, with shadowed names recorded in
+  `.dsh/.mcp-diag.json` (`shadowedByYml` / `shadowedByProject`). `type: "sse"` entries
+  are rejected per entry (the mount backend only speaks stdio and streamable-http);
+  unknown CC keys are tolerated; `enabled: false` skips an entry silently;
+  `type: "http"` and explicit `"streamable-http"` map to `streamable-http`, and a
+  url-only entry (no `type`/`command`) is inferred as http; project-layer stdio `cwd`
+  defaults to the project root while user-layer rows resolve against the host working
+  directory. The `~/.claude.json` watcher gates on a canonical-JSON
+  hash of the `mcpServers` subtree, so CC's routine state rewrites do not trigger
+  reconciles; `DSH_MCP_IGNORE_CLAUDE_JSON=1` disables reading and watching the file
+  entirely. There is deliberately no `local` scope (CC's `claude mcp add` default
+  location is explained wherever a user would expect it).
+- `${VAR}` runtime expansion (`src/model.ts` `expandEnvRefs`): `${NAME}` references
+  (`\$\{[A-Za-z_][A-Za-z0-9_]*\}`, allowed anywhere in the string — same semantics as
+  Claude Code, so `"Bearer ${TOKEN}"` works) in `command`, `args[*]`, `env[*]`, `url`,
+  and `headers[*]` are interpolated against the dsh host environment at mount time for
+  every configuration source. An unset **or empty** variable skips the row with an
+  `env-missing` diagnostic naming the variable only; expanded inputs are re-validated
+  against the mount schema and a malformed result is skipped with `env-invalid`.
+  Values are never persisted by the plugin, so
+  configs can live in git while secrets stay in the environment.
+- `dsh-mcp` CLI (`src/cli.ts`, new `bin` entry): `add` / `list` / `get` / `remove` with
+  `--scope project|user` (default project) and `--transport stdio|http`, mirroring CC
+  ergonomics. Writes land exclusively in native `.dsh/mcp.yml` files (project root or
+  `~/.dsh/mcp.yml`) through the locked atomic writer; `.mcp.json` / `~/.claude.json`
+  stay read-only and `remove` on a name that only exists there prints editing
+  guidance. `list`/`get` show all four layers with shadow annotations; secret values
+  render as key names only. No new runtime dependencies (hand-rolled argv parsing);
+  `runCli(argv, io, deps)` is importable for tests.
+- Tests: `test/test-cc-file.mjs` (dialect mapping, allowlist, hash stability,
+  content-free errors), `test/test-cli.mjs` (add/list/get/remove incl. `--` passthrough
+  and scope routing), and registry scenarios for multi-source shadowing, user-layer hot
+  mounting, the `~/.claude.json` hash gate, and `${VAR}` skip-then-mount.
+- Managed-block reader regression tests (`test/test-mcp-file.mjs`): literal rows load;
+  `!!js` in `env` or `disabled` and any other unresolved YAML tag inside the managed block
+  fail the file with an explicit error; tags outside the markers do not affect reading, and
+  panel writes preserve out-of-marker content byte-for-byte.
+- Registry regression scenario: a hot-reloaded file whose managed block becomes invalid is
+  unmounted (previously mounted servers disposed) without a remount attempt; the snapshot
+  reports the file error and the diagnostic file keeps the reason.
+- README and `docs/README.zh.md`: a "Divergences from the native cordis dialect" section
+  (`!!js` unsupported, `env`/`headers` `KEY: null` superset semantics), and a note that
+  model-visible tool names are built from the effective (possibly renamed) server name.
+- Repository guidance `AGENTS.md`: authoritative project overview, key behavior contracts,
+  and — as the single home the git skills point to — the Git commit cadence and branch
+  policy (features and fixes commit directly to `dev`; `main` only advances through
+  user-initiated PR/MR).
+
+### Changed
+
+- `snapshot()` partitions now carry a `source` tag (`yml` / `cc-project` / `user-yml` /
+  `cc-user`) and an optional `kind` (`workspace` projects, new `global` user-layer
+  partitions); each project additionally reports a `.mcp.json` partition (with
+  `entryErrors` for broken CC entries) when it has one, and per-server views gained
+  `source`. Absent a project `.dsh/mcp.yml`, the yml partition is skipped when no
+  yml-sourced server is mounted (user-layer mounts no longer look like "file deleted
+  under a live mount").
+- `${VAR}` references now interpolate inside strings at mount time for **all**
+  sources, including native `.dsh/mcp.yml` rows — previously documented as
+  literal-only. The expansion never rewrites files; nothing matches "mixed
+  forms" anymore because any embedded `${NAME}` interpolates (unset or empty →
+  `env-missing` skip).
+- The reconcile pipeline additionally reads the user layer (`~/.dsh/mcp.yml` and,
+  unless disabled, `~/.claude.json`), watching the `~/.dsh` directory and the
+  `~/.claude.json` file itself (never the home directory at large); the
+  zero-config "leave no trace" rule still holds — user-layer rows falling into a
+  project never create that project's diag file by themselves.
+- A project whose managed block fails to parse no longer takes down the whole snapshot: the
+  error is reported per file (`ok: false` plus the message) and that project's section is
+  empty, while every other project still reports its servers.
+- `reconnect.initialDelayMs` and `reconnect.maxDelayMs` are now bounded by 2147483647
+  (`MAX_TIMER_DELAY_MS`, mirroring `@deepseek-ai/dsh-mcp-client`'s timer ceiling), and
+  `reconnect.maxAttempts` by `Number.MAX_SAFE_INTEGER`. Out-of-range values are rejected at
+  config load instead of surfacing later as a plugin-mount failure.
+
+### Fixed
+
+- Diagnostics from async fiber callbacks (`active`/`failed` mount-phase events) are now
+  serialized through the reconcile chain instead of firing raw read-modify-write
+  appends that could clobber concurrently written scan lines out of
+  `.dsh/.mcp-diag.json`.
+- Native cordis `!!js` tags (js-yaml expressions the profile loader evaluates) inside the
+  managed block no longer load silently as literal strings. An unresolved tag now fails the
+  file with an explicit error naming the offending position, logged and written to
+  `.dsh/.mcp-diag.json` — previously such a line mounted with e.g.
+  `TOKEN: "process.env.GITHUB_TOKEN"` verbatim, or an expression-disabled line mounted as
+  enabled.
+- An unknown `transport` value is rejected with a clear "must be stdio or streamable-http"
+  error instead of falling into the stdio branch and reporting a misleading missing-`command`
+  error.
+
+## [0.1.1] - 2026-08-28
+
+### Added
+
+- Chinese documentation `docs/README.zh.md` (full translation of the plugin guide).
+- Language switch links at the top of `README.md` and `docs/README.zh.md`.
+- Project-local git skills under `.dsh/skills/` (`git-commits`, `git-history-safety`);
+  `.dsh/` is now git-ignored, so these stay out of the repository.
+- Registry regression tests: a project with a `.dsh/` directory but no `mcp.yml` produces no
+  diagnostic file and is not treated as a known project; a config file deleted while its server
+  is still mounted is still reported as a scan error and unmounted.
+
+### Changed
+
+- Installation section rewritten: npm-based installation is the primary method, with
+  three documented options — `dsh plugin --profile <name> add dsh-project-mcp-manager@latest`
+  (or `@<version>` to pin), plain `pnpm add` inside the profile directory, and
+  `pnpm add link:<path>` for a live local-development mount.
+- Documented bundle-patch mounting (`dsh.bundle.patch` → `cordis.patch.yml`) as the way the
+  plugin is synthesized into profile plugin lines at startup, and added a warning against
+  duplicating the loader entry id.
+- Replaced machine-specific absolute paths with generic `dshHome` placeholders
+  (`%USERPROFILE%\.dsh`, `$DSH_HOME`).
+- Added a prerequisite note for installing dsh itself
+  (`@deepseek-ai/dsh` from npm, or from source).
+- `package.json` now ships `docs/` in the published `files` list.
+
+### Fixed
+
+- Projects without a `<projectRoot>/.dsh/mcp.yml` no longer get a stray
+  `.dsh/.mcp-diag.json` written into them. A missing config file is now reported as an error
+  only when the project has live mounts (i.e. the file vanished underneath a running server);
+  clean scans that parse zero rows no longer append diagnostic records at all.
+- The false positive came from the `this.projects.has(key)` ENOENT-suppression guard, which was
+  always true because a project entry got registered even with zero servers. Project entries are
+  now created only for projects that actually have rows to mount, so directories merely visited
+  by a session — including the dsh process start directory (e.g. the user home) — stop
+  accumulating as known projects.
+- Diagnostic writes create the `.dsh` directory when needed (`mkdir -p` semantics), so a genuine
+  mount failure is no longer lost silently when the directory does not exist yet.
+
+## [0.1.0] - 2026-08-23
+
+### Added
+
+- Core plugin: per-project MCP server loading. Server lines written in
+  `<projectRoot>/.dsh/mcp.yml` are mounted automatically whenever a dsh session opens
+  in that project — no UI, core functionality only.
+- Managed-block configuration reader (`src/mcp-file.ts`): a YAML `insert` list between
+  `# >>> dsh-project-mcp-manager:mcp:begin` / `# <<< ...:mcp:end` markers, one MCP server
+  per line, with content outside the markers preserved byte-for-byte.
+- Configuration model and validation (`src/model.ts`, zod schemas) for `stdio`
+  (command/args/env/cwd) and `streamable-http` (url/headers) transports, plus
+  `toolCallTimeoutMs`, `failOnStartupError`, `reconnect` options and `disabled: true`
+  to deactivate a line.
+- Mounting registry (`src/registry.ts`): each `(project, serverName)` pair mounts one
+  `@deepseek-ai/dsh-mcp-client` instance via `ctx.plugin` on the host ctx and registers it
+  in the global tool layer; sessions in the same project share a single connection.
+- Hot reload with chokidar: each project root is watched (depth 2, ignoring
+  `node_modules`, `.git`, `.hg`, `.svn`); edits to `.dsh/mcp.yml` trigger a full
+  reconciliation after a 150 ms debounce — added lines mounted, removed lines unmounted,
+  changed lines remounted.
+- Deterministic effective server names: unique names are kept; on a collision across the
+  whole catalog, project lines are renamed to
+  `p<first 6 chars of sha256(projectRoot)>_<original name>` (truncated to 32 characters,
+  independent of mount order) to avoid per-process-root `serverName` reservation conflicts.
+  Global lines participate in occupancy determination but are never renamed.
+- Per-session tool visibility scoping (`src/index.ts`, `src/status.ts`): on agent creation the
+  session cwd resolves to a project and `tools.restrict({ deny })` denies every project
+  server except those of that session's own project; a session without a cwd falls back to the
+  owner project (subagents), then to the project containing the dsh process cwd. Restrictions
+  are released when the session is destroyed.
+- Project-root discovery (`src/project-root.ts`): walks up from `session.header.cwd` and the
+  dsh process start directory to the nearest ancestor containing `.git`, falling back to the
+  directory itself when there is no repository.
+- Bundle patch `cordis.patch.yml` so the plugin mounts automatically once the package is in
+  `dsh.profile.bundles`, without manual `cordis.patch.yml` editing.
+- Tests: `test/test-model.mjs` (config model/parsing) and `test/test-registry.mjs`
+  (registry reconciliation), plus the TypeScript build pipeline (`npm run build` → `lib/`).
+- Project scaffolding: `package.json` (ESM, `main: lib/index.js`), `tsconfig.json`,
+  `.gitignore`, MIT `LICENSE`, and `README.md`.
+
+### Changed
+
+- Package and plugin renamed from the working name `dsh-mcp-project` to
+  `dsh-project-mcp-manager` across `package.json`, `cordis.patch.yml`, sources, tests and
+  docs — the published v0.1.0 ships under the new name.
+
+Security note: `stdio` lines in `.dsh/mcp.yml` spawn their `command` inside the dsh host
+process, so project files are executable-code carriers — add them only in trusted projects.
+
+[unreleased]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.11.0...v0.11.1
+[0.11.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.8.2...v0.9.0
+[0.8.2]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.8.0...v0.8.2
+[0.8.1]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.7.2...v0.8.0
+[0.7.2]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.4.3...v0.6.0
+[0.4.3]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/wldxiaobai/dsh-project-mcp-manager/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/wldxiaobai/dsh-project-mcp-manager/releases/tag/v0.1.0

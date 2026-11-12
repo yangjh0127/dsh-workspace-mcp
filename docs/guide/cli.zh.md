@@ -1,0 +1,64 @@
+# CLI：`dsh-mcp`
+
+[English](cli.md) | 中文
+
+[← 返回 README](../README.zh.md) ｜ 相关：[配置格式](format.zh.md) · [配置来源与分层](layers.zh.md) · [`${VAR}` 展开](env-expansion.zh.md)
+
+原生配置文件命令行管理（**只写** `mcp.yml` 或 `mcp.json`——从不写遗留的
+`.mcp.json`；不连接运行中的 dsh 宿主，宿主经文件监听自动收敛）。web 端与桌面端
+也可以用[设置页](settings-ui.zh.md)完成添加、开关和删除：
+
+```powershell
+dsh-mcp add gitlab npx -y @modelcontextprotocol/server-gitlab -e GITLAB_TOKEN=${GITLAB_TOKEN}
+dsh-mcp add --transport http sentry https://mcp.sentry.dev/mcp -H "Authorization: Bearer ${SENTRY_TOKEN}"
+dsh-mcp add --scope user shared node ./tools/shared.js        # 写 ~/.dsh/mcp.yml
+dsh-mcp add --format json jsonproj node ./tools/p.js          # 写 <项目根>/.dsh/mcp.json
+dsh-mcp add --scope profile --profile web shared node ./s.js   # 写 ~/.dsh/profiles/web/mcp.yml
+dsh-mcp list          # 全部来源层展示，带遮蔽标注
+dsh-mcp get gitlab    # 优先层条目；密钥值只显示键名
+dsh-mcp remove gitlab # 按优先序在 yml/json 中查找并删除；命中只读层时给出编辑指引
+dsh-mcp status        # 层行数、名称与诊断摘要（不连接宿主）
+dsh-mcp import --from .cursor/mcp.json --dry-run   # 预演 mcpServers 导入，不写盘
+```
+
+作用域：`--scope project`（缺省，写最近 `.git` 祖先下的 `.dsh/mcp.yml`）、
+`--scope user`（写 `~/.dsh/mcp.yml`）与 `--scope profile`（须配 `--profile <name>`，
+写 `~/.dsh/profiles/<name>/mcp.yml`）。
+**写入格式**：`--format yml|json` 优先于环境变量 `DSH_MCP_CLI_FORMAT`（`yml`|`json`，
+缺省 `yml`）；`--format json` 时 project/user/profile 分别写 `.dsh/mcp.json`、
+`~/.dsh/mcp.json` 与 `~/.dsh/profiles/<name>/mcp.json`。`add` 的 `cwd` 缺省随作用域而变：project 为 `"."`（项目根），
+user/profile 为 `""`（宿主目录）；`-c` 显式覆盖。
+
+`add` 没有 `--allow` / `--deny`。条目级 `tools.allow` / `tools.deny`（以及 JSON
+的 `includeTools` / `excludeTools`）请写进配置文件，或用 `dsh-mcp import` 带入。
+`list` / `get` 仍会展示这些过滤（只显示模式文本）。
+
+**`status`** 读取七层来源文件与诊断文件（项目诊断在 `$DSH_HOME/mcp-diag/<hash>.json`，
+全局诊断在 `$DSH_HOME/.mcp-diag.json`，都不写进工作区）：打印每层行数与名称，再打印最近一次对账的
+`summary`（已装载 / 跳过原因 / 不健康行 / 工具预算）。旧版按需挂载写下的诊断文件还可能带
+「未装载（无会话）」，当前版本常驻挂载已不再产生。不连接宿主内存；宿主从未对账
+时文件不存在，命令会说明空态。`--scope project|user|profile` 同时过滤层列表与诊断文件
+（项目诊断对 `project`，`$DSH_HOME/.mcp-diag.json` 对 `user`/`profile`）。
+`--scope profile` 只列 profile 层（可再配 `--profile <name>`）；`--scope user` 仍列全部用户层
+（含所有 profile 文件）。旧版宽限卸载的 idle 行打印为「未装载（无会话）」，不算不健康。
+
+**`import`** 把 `{"mcpServers":{...}}` 写入原生 yml 或 JSON（`--scope` /
+`--format` / `--profile` 与 `add` 相同，缺省作用域为 **project**）。同名默认
+跳过，加 `--overwrite` 才覆盖（skip/overwrite 在文件锁内判定，与 `add` 一致）。`--dry-run` 打印增/跳/覆盖计划与影子冲突
+（`shadowViewOf`）且不写盘。VS Code 的 `{servers:{…}}`、单条对象、JSON 数组
+一律拒绝。坏条目逐条报错，合法兄弟仍导入。`--from -` 读 stdin。
+
+没有 `local` 作用域——`--scope local` 会报错并解释。`--transport` 接受
+`stdio`（缺省）与 `http`；MCP SSE 端点传输（`sse`）拒绝并给出可执行出路
+（把 `type` 改为 `"http"`，或删除 `type` 只留 `url`）。
+
+**保留短名**：`-s`/`-t`/`-e`/`-H`/`-c`/`-h` 之外，v0.4.0 起 `-f`（`--format`）与
+`-p`（`--profile`）也是本 CLI 的选项。这两个短名会连带吞掉下一个词元作为选项值：
+要把它们传给被 spawn 的服务器命令，请写在 `--` 之后（`--` 之后全部按位置参数透传）。
+`--from`、`--dry-run`、`--overwrite` 留给 `import`。其余以 `-` 开头的未知词元仍原样透传给服务器命令行。
+
+**独占契约**：JSON 文件由本 CLI 独占（宿主插件与设置页都不写）。写入保留其他顶层键与键序、
+解析失败拒绝覆盖、原子写；`${VAR}` 原样写入，凭据留在环境里（见
+[`${VAR}` 展开](env-expansion.zh.md)）。yml 侧走受管块，begin/end 标记之外的内容
+逐字节保留。受管 yml 由本 CLI 与[设置页](settings-ui.zh.md)共用，两边经同一把
+文件锁读-改-写，可以混用。

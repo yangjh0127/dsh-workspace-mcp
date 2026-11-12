@@ -1,0 +1,264 @@
+/**
+ * JSON 方言读取测试：条目归一（stdio/http/sse）、坏条目隔离、诊断不泄露文件内容、
+ * DSH 自有 JSON 层（项目/profile/用户）的 cwd 策略与透传键、遗留 CC 项目层语义。
+ */
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { mcpJsonLayerEnabled, readDshJsonFile, readMcpJsonFile } from "../lib/json-file.js";
+import { byCodeUnit } from "../lib/model.js";
+
+let passed = 0;
+function pass(name) {
+  passed += 1;
+  console.log("PASS  " + name);
+}
+
+const dir = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-jsonfile-"));
+const write = async (name, text) => {
+  const path = join(dir, name);
+  await writeFile(path, text, "utf8");
+  return path;
+};
+
+try {
+  // 1. 遗留 CC 项目层：stdio 条目归一、args 缺省 []、cwd 固定项目根、行形状与受管行同构
+  const p1 = await write("mcp.json", JSON.stringify({
+    mcpServers: {
+      tasks: { command: "node", args: ["server.js"], env: { TOKEN: "${GH_TOKEN}" } },
+      plain: { command: "npx" }
+    }
+  }));
+  const r1 = await readMcpJsonFile(p1, "/work/proj");
+  assert.equal(r1.fileError, undefined);
+  assert.deepEqual(r1.entryErrors, []);
+  assert.equal(r1.rows.length, 2);
+  const tasks = r1.rows.find((row) => row.rawName === "tasks");
+  assert.equal(tasks.source, "cc-project");
+  assert.equal(tasks.row.id, "panel-mcp-tasks");
+  assert.equal(tasks.row.name, "@deepseek-ai/dsh-mcp-client");
+  assert.equal(tasks.row.config.transport, "stdio");
+  assert.equal(tasks.row.config.command, "node");
+  assert.deepEqual(tasks.row.config.args, ["server.js"]);
+  assert.equal(tasks.row.config.cwd, "/work/proj");
+  assert.equal(tasks.row.config.env.TOKEN, "${GH_TOKEN}"); // 保持字面值，mount 时才展开
+  assert.deepEqual(r1.rows.find((row) => row.rawName === "plain").row.config.args, []);
+  pass("legacy cc-project: stdio entries normalize with defaults, project-root cwd, ${VAR} kept literal");
+
+  // 2. type:"http" → streamable-http + headers；多余字段容忍
+  const p2 = await write("http.json", JSON.stringify({
+    mcpServers: { remote: { type: "http", url: "https://example.com/mcp", headers: { Authorization: "Bearer ${TOK}" }, timeout: 5000 } }
+  }));
+  const r2 = await readMcpJsonFile(p2, "/work/proj");
+  assert.equal(r2.rows.length, 1);
+  assert.equal(r2.rows[0].row.config.transport, "streamable-http");
+  assert.equal(r2.rows[0].row.config.url, "https://example.com/mcp");
+  assert.equal(r2.rows[0].row.config.headers.Authorization, "Bearer ${TOK}");
+  assert.equal(r2.rows[0].row.config.toolCallTimeoutMs, 60000);
+  pass("http entries map to streamable-http; unknown keys tolerated");
+
+  // 3. sse 拒绝 + 坏条目隔离（非法名、缺 command、缺 url、非字符串 env 值），其余条目保留
+  const p3 = await write("mixed.json", JSON.stringify({
+    mcpServers: {
+      legacy: { type: "sse", url: "https://example.com/sse" },
+      "bad name!": { command: "x" },
+      empty: {},
+      "http-no-url": { type: "http" },
+      "num-env": { command: "x", env: { A: 1 } },
+      survivor: { command: "keep-me" }
+    }
+  }));
+  const r3 = await readMcpJsonFile(p3, "/work/proj");
+  assert.equal(r3.fileError, undefined);
+  assert.equal(r3.rows.length, 1);
+  assert.equal(r3.rows[0].rawName, "survivor");
+  assert.equal(r3.entryErrors.length, 5);
+  assert.ok(r3.entryErrors.some((e) => /MCP SSE 端点传输/.test(e)), "sse rejection names the MCP SSE endpoint transport");
+  assert.ok(r3.entryErrors.some((e) => /把 type 改为 "http"/.test(e)), "sse error offers changing type to http");
+  assert.ok(r3.entryErrors.some((e) => /删除 type 只留 url/.test(e)), "sse error offers dropping type and keeping url");
+  assert.ok(r3.entryErrors.some((e) => /serverName 非法/.test(e)));
+  assert.ok(r3.entryErrors.some((e) => /缺少 command/.test(e)));
+  pass("sse and broken entries are rejected per-entry without affecting valid ones");
+
+  // 3b. enabled:false 静默跳过（不占名）；disabled:true 占名不装载；url 无 type 按 http 推断
+  const p3b = await write("quirks.json", JSON.stringify({
+    mcpServers: {
+      "off-switch": { command: "node", enabled: false },
+      "off-alias": { command: "node", disabled: true },
+      "off-truthy": { command: "node", disabled: false, enabled: true },
+      "url-only": { url: "https://example.com/mcp" },
+      "full-name": { type: "streamable-http", url: "https://example.com/s" }
+    }
+  }));
+  const r3b = await readDshJsonFile(p3b, { source: "dsh-project-json", cwdPolicy: "project", projectRoot: "/work/proj" });
+  assert.deepEqual(r3b.entryErrors, [], "off flags must be silent, url-only must not error as missing-command");
+  const r3bNames = r3b.rows.map((row) => row.rawName);
+  r3bNames.sort(byCodeUnit);
+  assert.deepEqual(r3bNames, ["full-name", "off-alias", "off-truthy", "url-only"]);
+  const alias = r3b.rows.find((row) => row.rawName === "off-alias");
+  assert.equal(alias.disabled, true, "disabled:true occupies the name");
+  assert.equal(alias.row.disabled, true);
+  assert.equal(r3b.rows.find((row) => row.rawName === "url-only").row.config.transport, "streamable-http");
+  pass("enabled:false skipped silently; disabled:true occupies the name; url inferred as http");
+
+  // 4. DSH 自有 JSON 层：缺 mcpServers 视为空层；cwd 策略按来源分化；DSH 透传键生效
+  const p4 = await write("dsh.json", JSON.stringify({
+    mcpServers: {
+      proj: { command: "node", args: ["p.js"], toolCallTimeoutMs: 1234, failOnStartupError: true, maxInstructionBytes: 65536, reconnect: { maxAttempts: 3 } },
+      user: { command: "node", args: ["u.js"], cwd: "sub" }
+    }
+  }));
+  const projRows = await readDshJsonFile(p4, { source: "dsh-project-json", cwdPolicy: "project", projectRoot: "/work/proj" });
+  const proj = projRows.rows.find((row) => row.rawName === "proj");
+  assert.equal(proj.source, "dsh-project-json");
+  assert.equal(proj.row.config.cwd, "/work/proj");
+  assert.equal(proj.row.config.toolCallTimeoutMs, 1234);
+  assert.equal(proj.row.config.failOnStartupError, true);
+  assert.equal(proj.row.config.maxInstructionBytes, 65536);
+  assert.equal(proj.row.config.reconnect.maxAttempts, 3);
+  assert.equal(projRows.rows.find((row) => row.rawName === "user").row.config.cwd, "sub");
+  const userRows = await readDshJsonFile(p4, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.equal(userRows.rows.find((row) => row.rawName === "proj").row.config.cwd, "", "user layer keeps host cwd");
+  const noKey = await readDshJsonFile(await write("other.json", '{"theme":"dark"}'), { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.deepEqual(noKey.rows, []);
+  assert.equal(noKey.fileError, undefined, "missing mcpServers is an empty DSH layer");
+  assert.ok(/缺少 mcpServers/.test((await readMcpJsonFile(join(dir, "other.json"), "/p")).fileError ?? ""), "legacy file still errors");
+  pass("DSH json layers: cwd policy per source, passthrough keys, missing mcpServers is empty");
+
+  // 5. JSON 损坏：fileError 不得含文件内容片段
+  const secret = "sk-liv${secret-not-allowed-in-error}e";
+  const p5 = await write("broken.json", `{"mcpServers": {"a": {"command": "${secret}",}}`);
+  const r5 = await readMcpJsonFile(p5, "/work/proj");
+  assert.ok(r5.fileError !== undefined && /JSON 解析失败/.test(r5.fileError));
+  assert.ok(!JSON.stringify(r5).includes(secret), "diagnostics must never contain file content");
+  const r6 = await readMcpJsonFile(await write("arr.json", "[]"), "/p");
+  assert.ok(/顶层必须是 JSON 对象/.test(r6.fileError ?? ""));
+  pass("file-level errors are reported without leaking content; shape violations detected");
+
+  // 6. 文件缺失是正常空结果
+  const missing = join(dir, "does-not-exist.json");
+  assert.deepEqual((await readMcpJsonFile(missing, "/p")).rows, []);
+  assert.equal((await readMcpJsonFile(missing, "/p")).fileError, undefined);
+  assert.deepEqual((await readDshJsonFile(missing, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" })).rows, []);
+  pass("missing files yield empty results without errors");
+
+  // 6b. C2：httpUrl、显式 transport、url/httpUrl 冲突、transport 与 type 冲突
+  const pHttpUrl = await write("httpurl.json", JSON.stringify({
+    mcpServers: { gemini: { httpUrl: "https://gemini.example/mcp", headers: { Authorization: "Bearer ${T}" } } }
+  }));
+  const rHttpUrl = await readDshJsonFile(pHttpUrl, { source: "dsh-project-json", cwdPolicy: "project", projectRoot: "/work/proj" });
+  assert.deepEqual(rHttpUrl.entryErrors, []);
+  assert.equal(rHttpUrl.rows[0].row.config.transport, "streamable-http");
+  assert.equal(rHttpUrl.rows[0].row.config.url, "https://gemini.example/mcp");
+  const pTransport = await write("transport.json", JSON.stringify({
+    mcpServers: { native: { transport: "streamable-http", url: "https://n.example/mcp" } }
+  }));
+  const rTransport = await readDshJsonFile(pTransport, { source: "dsh-project-json", cwdPolicy: "project", projectRoot: "/work/proj" });
+  assert.equal(rTransport.rows[0].row.config.transport, "streamable-http");
+  const pSame = await write("sameurl.json", JSON.stringify({
+    mcpServers: { both: { url: "https://same.example/mcp", httpUrl: "https://same.example/mcp" } }
+  }));
+  assert.equal((await readDshJsonFile(pSame, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" })).rows[0].row.config.url, "https://same.example/mcp");
+  const pConflictUrl = await write("conflict-url.json", JSON.stringify({
+    mcpServers: { clash: { url: "https://a.example/mcp", httpUrl: "https://b.example/mcp" } }
+  }));
+  const rConflictUrl = await readDshJsonFile(pConflictUrl, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.equal(rConflictUrl.rows.length, 0);
+  assert.ok(rConflictUrl.entryErrors.some((e) => /url 与 httpUrl/.test(e)), "url/httpUrl mismatch: " + rConflictUrl.entryErrors.join(";"));
+  assert.ok(!JSON.stringify(rConflictUrl).includes("a.example"), "conflict error must not echo url values");
+  const pConflictType = await write("conflict-type.json", JSON.stringify({
+    mcpServers: { clash: { transport: "stdio", type: "http", command: "node", url: "https://x/mcp" } }
+  }));
+  const rConflictType = await readDshJsonFile(pConflictType, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.ok(rConflictType.entryErrors.some((e) => /transport .* 与 type .* 冲突/.test(e)), "transport/type mismatch: " + rConflictType.entryErrors.join(";"));
+  const pSseTransport = await write("sse-transport.json", JSON.stringify({
+    mcpServers: { old: { transport: "sse", url: "https://sse.example/sse" } }
+  }));
+  const rSseTransport = await readDshJsonFile(pSseTransport, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.ok(rSseTransport.entryErrors.some((e) => /MCP SSE 端点传输/.test(e)), "transport:sse uses the C1 message");
+  const pHttpUrlStdio = await write("httpurl-stdio.json", JSON.stringify({
+    mcpServers: { clash: { httpUrl: "https://h.example/mcp", type: "stdio", command: "node" } }
+  }));
+  const rHttpUrlStdio = await readDshJsonFile(pHttpUrlStdio, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.ok(rHttpUrlStdio.entryErrors.some((e) => /httpUrl/.test(e) && /stdio/.test(e)), "httpUrl vs stdio conflict");
+  pass("httpUrl, transport key, url/httpUrl and transport/type conflicts, transport:sse");
+
+  // 6d. 无 type/transport 时 command 与 url 并存：条目错误，不静默当 stdio
+  const pBothEnds = await write("both-ends.json", JSON.stringify({
+    mcpServers: { mixed: { command: "npx", args: ["-y", "foo"], url: "https://example/mcp" } }
+  }));
+  const rBothEnds = await readDshJsonFile(pBothEnds, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.equal(rBothEnds.rows.length, 0, "ambiguous command+url must not mount");
+  assert.ok(rBothEnds.entryErrors.some((e) => /同时有 command 与 url/.test(e) && /type 或 transport/.test(e)), "ambiguous command+url: " + rBothEnds.entryErrors.join(";"));
+  assert.ok(!JSON.stringify(rBothEnds).includes("example/mcp"), "ambiguous error must not echo the url");
+  const pBothHttpUrl = await write("both-httpurl.json", JSON.stringify({
+    mcpServers: { mixed: { command: "npx", httpUrl: "https://gemini.example/mcp" } }
+  }));
+  const rBothHttpUrl = await readDshJsonFile(pBothHttpUrl, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.equal(rBothHttpUrl.rows.length, 0);
+  assert.ok(rBothHttpUrl.entryErrors.some((e) => /同时有 command 与 url/.test(e)), "command+httpUrl: " + rBothHttpUrl.entryErrors.join(";"));
+  const pTyped = await write("typed-stdio.json", JSON.stringify({
+    mcpServers: { ok: { type: "stdio", command: "npx", url: "https://ignored.example/mcp" } }
+  }));
+  const rTyped = await readDshJsonFile(pTyped, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.equal(rTyped.rows.length, 1, "explicit type keeps the declared transport");
+  assert.equal(rTyped.rows[0].row.config.transport, "stdio");
+  pass("undeclared command+url is an entry error; explicit type still wins");
+
+  // 6c. C4：对方 {version, servers} 格式诊断；与 mcpServers 共存时不告警
+  const pForeign = await write("foreign.json", JSON.stringify({ version: 1, servers: [{ name: "x", transport: "stdio" }] }));
+  const rForeign = await readDshJsonFile(pForeign, { source: "dsh-project-json", cwdPolicy: "project", projectRoot: "/work/proj" });
+  assert.equal(rForeign.rows.length, 0);
+  assert.equal(rForeign.fileError, undefined, "foreign format is an empty DSH layer, not a parse error");
+  assert.match(rForeign.formatHint ?? "", /dsh-mcp-manager/);
+  assert.match(rForeign.formatHint ?? "", /mcpServers/);
+  const pBoth = await write("both.json", JSON.stringify({ mcpServers: { keep: { command: "node" } }, servers: [], version: 1 }));
+  const rBoth = await readDshJsonFile(pBoth, { source: "dsh-project-json", cwdPolicy: "project", projectRoot: "/work/proj" });
+  assert.equal(rBoth.formatHint, undefined, "mcpServers + servers together is our dialect");
+  assert.equal(rBoth.rows[0].rawName, "keep");
+  const pServersOnly = await write("servers-only.json", JSON.stringify({ servers: [] }));
+  assert.match((await readDshJsonFile(pServersOnly, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" })).formatHint ?? "", /servers/);
+  const pTheme = await write("theme.json", JSON.stringify({ theme: "dark" }));
+  assert.equal((await readDshJsonFile(pTheme, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" })).formatHint, undefined, "unrelated JSON stays a silent empty layer");
+  const pWrongFile = await write("dsh-mcp.json", JSON.stringify({ mcpServers: { sneak: { command: "node" } } }));
+  const rWrongFile = await readDshJsonFile(pWrongFile, { source: "dsh-user", cwdPolicy: "host", projectRoot: "" });
+  assert.equal(rWrongFile.rows.length, 0, "mcpServers in dsh-mcp.json must not load");
+  assert.match(rWrongFile.formatHint ?? "", /dsh-mcp\.json/);
+  assert.match(rWrongFile.formatHint ?? "", /mcp\.json/);
+  pass("foreign {version, servers} format is diagnosed; mcpServers coexistence is silent");
+
+  const pTools = await write("tools.json", JSON.stringify({
+    mcpServers: {
+      dsh: { command: "node", tools: { allow: ["read_*"], deny: ["read_secret"] }, includeTools: ["ignored"], excludeTools: ["ignored"] },
+      eco: { command: "node", includeTools: ["list_*"], excludeTools: ["list_hidden"] }
+    }
+  }));
+  const rTools = await readDshJsonFile(pTools, { source: "dsh-project-json", cwdPolicy: "project", projectRoot: "/work/p" });
+  assert.deepEqual(rTools.entryErrors, []);
+  const dsh = rTools.rows.find((row) => row.rawName === "dsh");
+  assert.deepEqual(dsh.row.config.tools, { allow: ["read_*"], deny: ["read_secret"] });
+  const eco = rTools.rows.find((row) => row.rawName === "eco");
+  assert.deepEqual(eco.row.config.tools, { allow: ["list_*"], deny: ["list_hidden"] });
+  pass("JSON tools.allow/deny win over includeTools/excludeTools");
+} finally {
+  await rm(dir, { recursive: true, force: true });
+}
+
+// 7. 共存边界开关谓词真值表（纯函数，传入合成 env，不碰 process.env）
+assert.equal(mcpJsonLayerEnabled({}), true, "legacy .mcp.json layer on by default");
+assert.equal(mcpJsonLayerEnabled({ DSH_MCP_IGNORE_MCP_JSON: "1" }), false, "IGNORE_MCP_JSON closes it");
+pass("legacy project .mcp.json switch follows the documented truth table");
+
+// 8. 不再读取任何 Claude 用户态文件：编译产物里不得出现该路径
+const libDir = new URL("../lib/", import.meta.url);
+const libFiles = (await readdir(libDir)).filter((name) => name.endsWith(".js"));
+assert.ok(libFiles.length > 0);
+for (const name of libFiles) {
+  const text = await readFile(new URL(name, libDir), "utf8");
+  assert.ok(!/claude\.json/i.test(text), `${name} must not reference the Claude user state file`);
+}
+pass("no built module references the Claude user state file");
+
+console.log("\n" + passed + " passed, 0 failed");
+console.log("ALL JSON FILE TESTS PASSED");
