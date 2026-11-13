@@ -137,47 +137,4 @@ exported above follow semantic versioning **for the companion UI**:
 
 `setLoadingMode` is a new method, and `McpLoadingMode`, `McpAddDraft.mode`, and
 `McpServerView.mode` are new types/fields: all are additive **minor** changes.
-An older UI still works and ignores `mode`; a newer UI that calls
-`setLoadingMode` requires the matching core, so an old core cannot be paired
-with the new UI. Both packages must be bumped and released together, never one
-alone. This source change does not bump the version; the release step performs
-the minor bump for both packages.
-
-The manager lists `dsh-workspace-mcp-ui` as a runtime dependency pinned to the
-**same exact version**. The UI keeps this package as a peer dependency at that
-exact version. Neither published contract uses `^` or `~`; both packages must
-be versioned and released together. Users install only the manager, whose
-default bundle owns the core and UI rows; the UI is no longer a standalone
-`dsh.bundle` ([installation and migration](settings-ui.md#install)).
-
-The manager's published dependency contract is:
-
-```json
-{
-  "dependencies": {
-    "dsh-workspace-mcp-ui": "<exact version of this package>"
-  }
-}
-```
-
-The UI's matching peer contract is:
-
-```json
-{
-  "peerDependencies": {
-    "dsh-workspace-mcp": "<exact version of this package>"
-  }
-}
-```
-
-Replace both placeholders with the manager/UI release version. In the source
-workspace the manager uses `workspace:<exact version>`; `pnpm pack` replaces
-that specifier with the exact version above. Do not use `npm pack` directly on
-the workspace manifest. Root `pnpm run build` compiles the core before building
-the UI, so the UI consumes the current core declarations; the UI build first
-cleans its output directory.
-
-For a future authorized release, publish the vetted UI and manager tarballs
-under a non-`latest` staging tag, then promote both only after a fresh-consumer
-install smoke check. This is release guidance, not a claim that publication
-or that check has already happened.
+The root build compiles the loader before the UI so the UI uses the current loader declarations. The installation package ships both components together.

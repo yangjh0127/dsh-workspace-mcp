@@ -7,16 +7,20 @@ const ui = JSON.parse(await readFile(new URL("../packages/ui/package.json", impo
 const patch = parse(await readFile(new URL("../cordis.patch.yml", import.meta.url), "utf8"));
 
 assert.equal(ui.version, root.version, "loader and UI must be released together");
-assert.equal(root.dependencies[ui.name], `workspace:${root.version}`, "pack must resolve an exact UI dependency, not an optional dependency or a range");
-assert.equal(ui.peerDependencies[root.name], root.version, "UI must consume the matching service contract");
-assert.equal(root.optionalDependencies?.[ui.name], undefined, "UI is shipped by default, not optional");
+assert.equal(ui.private, true);
+assert.ok(root.files.includes("packages/ui/lib"));
+assert.ok(root.files.includes("packages/ui/package.json"));
+assert.equal(root.scripts.prepare, "npm run build");
+for (const [dependency, range] of Object.entries(ui.dependencies)) {
+  assert.equal(root.dependencies[dependency], range, `the install package must ship the UI dependency ${dependency}`);
+}
 assert.equal(root.dsh.bundle.patch, "./cordis.patch.yml");
 assert.ok(root.files.includes("cordis.patch.yml"));
 assert.equal(ui.dsh.bundle, undefined, "UI must not insert another independently selected bundle layer");
 assert.ok(!ui.files.includes("cordis.patch.yml"));
 assert.deepEqual(patch.flatMap((item) => item.insert ?? []).map(({ id, name, disabled }) => ({ id, name, disabled })), [
   { id: "mcp-project", name: root.name, disabled: undefined },
-  { id: "mcp-project-ui", name: ui.name, disabled: undefined }
+  { id: "mcp-project-ui", name: "./packages/ui/lib/index.js", disabled: undefined }
 ]);
 assert.equal(ui.dsh.client.platform, "web");
 assert.equal(ui.exports["./client"], "./lib/client.js");

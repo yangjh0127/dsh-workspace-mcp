@@ -13,21 +13,13 @@ web 端与桌面端加一个 **MCP 管理** 页面，主页左侧栏、设置页
 
 ## 安装
 
-按[中文 README](../README.zh.md) 构建后，只需在所用 profile 中链接 **manager**：
-
-```powershell
-dsh plugin --profile web add "link:$((Get-Location).Path -replace '\\','/')"
-dsh plugin --profile desktop add "link:$((Get-Location).Path -replace '\\','/')"
-```
+按[中文 README](../README.zh.md#安装) 从 GitHub 安装。
 
 插件通过 **bundle patch** 挂载：把包加入 `dsh.profile.bundles` 后，dsh 启动时
 按顺序把每个 bundle 的 patch（`dsh.bundle.patch` 指向的 `cordis.patch.yml`）合成
 为插件行。
 
-manager 以**同一精确版本**依赖 `dsh-workspace-mcp-ui`，会自动安装 UI。默认 bundle
-包含 `mcp-project`（核心）与 `mcp-project-ui`（UI）两行，均默认启用。UI 保留
-精确版本的 manager peer dependency，但不再单独声明 `dsh.bundle`，不要另选 UI
-bundle。两个包必须同步发布（[版本契约](service.zh.md#对配套-ui-的语义化版本)）。
+安装包同时包含装载器与 UI，默认启用 `mcp-project` 和 `mcp-project-ui`。
 
 本地开发时，在源码仓库内执行以下命令，只链接根 manager 包：
 

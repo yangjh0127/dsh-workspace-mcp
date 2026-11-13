@@ -8,17 +8,14 @@ Requires DeepSeek Harness `0.2.2-rc.1` or later in the `0.2` series, plus Git, N
 
 ## Install
 
-Clone this repository, build it, and link it to your DSH profile. Keep the checkout at a stable path because DSH loads the compiled plugin from it.
+Install from GitHub. pnpm downloads the source and builds the loader and MCP Manager UI together.
 
 ```powershell
-git clone https://github.com/yangjh0127/dsh-workspace-mcp.git
-cd dsh-workspace-mcp
-pnpm install --frozen-lockfile
-pnpm run build
-dsh plugin --profile web add "link:$((Get-Location).Path -replace '\\','/')"
+dsh plugin --profile web add github:yangjh0127/dsh-workspace-mcp#main --allow-build=dsh-workspace-mcp
 ```
 
-The root package includes the MCP Manager UI. Use the profile you run, such as `web` or `desktop`, then restart DSH. To update, run `git pull --ff-only`, `pnpm install --frozen-lockfile`, and `pnpm run build` in the linked checkout, then restart DSH.
+Use the profile you run, such as `web` or `desktop`, then restart DSH. To update, rerun the install command and restart DSH.
+For local development, see [linking a checkout](docs/guide/settings-ui.md#install).
 
 ## Configure MCP servers
 

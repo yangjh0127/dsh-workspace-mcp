@@ -9,4 +9,4 @@
     - id: mcp-project
       name: dsh-workspace-mcp
     - id: mcp-project-ui
-      name: dsh-workspace-mcp-ui
+      name: ./packages/ui/lib/index.js

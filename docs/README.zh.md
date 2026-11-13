@@ -8,17 +8,14 @@ DSH Workspace MCP 从工作区配置加载 MCP 服务器，并按会话所属的
 
 ## 安装
 
-克隆本仓库，构建后链接到你使用的 DSH profile。请把仓库放在固定目录，DSH 会从该目录加载编译产物。
+从 GitHub 安装。pnpm 下载源码，并一起构建装载器和 MCP 管理页。
 
 ```powershell
-git clone https://github.com/yangjh0127/dsh-workspace-mcp.git
-cd dsh-workspace-mcp
-pnpm install --frozen-lockfile
-pnpm run build
-dsh plugin --profile web add "link:$((Get-Location).Path -replace '\\','/')"
+dsh plugin --profile web add github:yangjh0127/dsh-workspace-mcp#main --allow-build=dsh-workspace-mcp
 ```
 
-根包自带 MCP 管理页。按实际使用的 profile 选择 `web` 或 `desktop`，安装后重启 DSH。更新时，在已链接的仓库目录依次运行 `git pull --ff-only`、`pnpm install --frozen-lockfile` 和 `pnpm run build`，再重启 DSH。
+按实际使用的 profile 选择 `web` 或 `desktop`，安装后重启 DSH。更新时重新运行安装命令，再重启 DSH。
+本地开发可参照[链接源码目录](guide/settings-ui.zh.md#安装)。
 
 ## 配置 MCP 服务器
 

@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- GitHub source installation builds and packages the loader and UI together.
+
 - Per-server Lazy mode. The MCP Manager and project config support opt-in
   discovery and invocation through three session-scoped proxies.
   Contributed by [@yangjh0127](https://github.com/yangjh0127) in

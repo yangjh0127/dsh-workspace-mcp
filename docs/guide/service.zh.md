@@ -119,41 +119,4 @@ import {
 | major | 删除、改名，或改变含义。 |
 
 `setLoadingMode` 是新增方法，`McpLoadingMode`、`McpAddDraft.mode`、`McpServerView.mode`
-是新增类型/字段，按上表都属于 **minor** additive 变更。旧 UI 忽略 `mode` 字段仍然
-可用；新 UI 调用 `setLoadingMode` 时要求核心已经提供该方法，所以不能用旧核心配新
-UI。包含这些改动的两个包必须一起升版、一起发布，不能只升其中一个。本次源码改动不改
-版本号；发版时再按 minor 一起提升两个包。
-
-manager 以**同一精确版本**的运行时 dependency 依赖 `dsh-workspace-mcp-ui`；UI
-保留同一精确版本的 manager peer dependency。发布后的两份契约都不用 `^` 或
-`~`，两个包必须同步升版、同步发布。用户只安装 manager，它的默认 bundle 负责
-核心与 UI 两行；UI 不再单独声明 `dsh.bundle`（[安装与迁移](settings-ui.zh.md#安装)）。
-
-manager 发布后的依赖契约：
-
-```json
-{
-  "dependencies": {
-    "dsh-workspace-mcp-ui": "<本包的精确版本>"
-  }
-}
-```
-
-UI 配套的 peer 契约：
-
-```json
-{
-  "peerDependencies": {
-    "dsh-workspace-mcp": "<本包的精确版本>"
-  }
-}
-```
-
-两个占位符都换成 manager/UI 同步发布的版本。源码 workspace 中，manager 使用
-`workspace:<精确版本>`，`pnpm pack` 时会转为上面的精确版本；不要直接对含
-workspace 协议的 manifest 使用 `npm pack`。根目录 `pnpm run build` 先编译核心
-再构建 UI，使 UI 消费当前核心的类型声明；UI 构建先清空自己的产物目录。
-
-未来获准发布时，应把验收过的 UI 与 manager tarball 发布到非 `latest` 的 staging
-标签，经全新消费方安装冒烟检查后，再一起提升标签。这是发布指引，不表示已经发布
-或已经通过该检查。
+是新增类型/字段，按上表都属于 **minor** additive 变更。根目录构建命令先编译装载器，再用当前的类型声明编译 UI。安装包同时包含两个组件。

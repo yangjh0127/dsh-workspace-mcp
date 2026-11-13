@@ -16,25 +16,14 @@ and the [CLI](cli.md) can be used side by side.
 
 ## Install
 
-Build the checkout using the [README](../../README.md#install), then link **only the manager** into the profile you use:
-
-```powershell
-dsh plugin --profile web add "link:$((Get-Location).Path -replace '\\','/')"
-dsh plugin --profile desktop add "link:$((Get-Location).Path -replace '\\','/')"
-```
+Follow the [README](../../README.md#install) to install from GitHub.
 
 The plugin is mounted through a **bundle patch**: once the package is in
 `dsh.profile.bundles`, dsh turns each bundle's patch (the `cordis.patch.yml`
 pointed to by `dsh.bundle.patch`) into plugin rows at startup, in order.
 
-The manager depends on `dsh-workspace-mcp-ui` at the **same exact version**, so
-the UI is installed automatically. Its default bundle contains `mcp-project`
-(core) and `mcp-project-ui` (UI), both enabled. The UI package keeps its exact
-manager peer dependency but no longer declares a standalone `dsh.bundle`;
-do not select it as a separate bundle. The two packages must be released
-together ([version contract](service.md#semver-for-the-companion-ui)). This
-layout is included in source version **0.8.0**; the npm examples apply after
-both 0.8.0 packages are published. A Git tag does not publish to npm.
+The package ships the UI alongside the loader. Its default bundle enables
+`mcp-project` (core) and `mcp-project-ui` (UI).
 
 For local development, run these commands in the source checkout and link
 only the root manager package:
