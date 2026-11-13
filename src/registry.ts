@@ -1,5 +1,5 @@
 /**
- * dsh-project-mcp-manager —— 项目级 MCP 装载与按会话可见性。
+ * dsh-workspace-mcp —— 项目级 MCP 装载与按会话可见性。
  *
  * 项目级 MCP 服务器配置存放在 <projectRoot>/.dsh/mcp.yml（与技能侧的
  * <projectRoot>/.dsh/skills/ 并列），文件格式与 profile cordis.patch.yml
@@ -1049,7 +1049,7 @@ export class ProjectMcpRegistry {
       await this.reconcileAll();
     });
 
-    ctx.effect(() => () => this.disposeRuntime(), "dsh-project-mcp-manager: project mcp registry");
+    ctx.effect(() => () => this.disposeRuntime(), "dsh-workspace-mcp: project mcp registry");
   }
 
   private disposeRuntime(): void {

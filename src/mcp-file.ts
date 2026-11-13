@@ -1,12 +1,12 @@
 /**
- * dsh-project-mcp-manager —— 项目 MCP 配置文件（<projectRoot>/.dsh/mcp.yml）编辑器。
+ * dsh-workspace-mcp —— 项目 MCP 配置文件（<projectRoot>/.dsh/mcp.yml）编辑器。
  *
  * 项目文件使用与 profile cordis.patch.yml 相同的受管块格式：begin/end 标记
  * 之间的 YAML insert 列表（与 @deepseek-ai/dsh-mcp-client 插件行同构）。
  * 本插件只读写 begin/end 标记之间的行，标记之外的内容逐字节保留。
  * 写入使用同目录临时文件 + rename，并通过锁文件避免并发写。
  *
- * 标记名与 dsh-skill-mcp-panel 不同（dsh-project-mcp-manager vs dsh-skill-mcp-panel），
+ * 沿用旧包名的受管块标记以兼容已有配置，与 dsh-skill-mcp-panel 的标记不同，
  * 但行 id 前缀兼容 panel 的 `panel-mcp-`，v2.1 面板写出的项目文件可直接读取。
  */
 import { open, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
@@ -82,7 +82,7 @@ export function extractManagedRows(raw: string): PatchRow[] {
   const begin = raw.indexOf(MCP_BLOCK_BEGIN);
   const end = raw.indexOf(MCP_BLOCK_END);
   if (begin < 0 && end < 0) return [];
-  if (begin < 0 || end < 0 || end < begin) throw new Error("项目 MCP 文件中 dsh-project-mcp-manager 受管块标记不完整（begin/end 必须成对）");
+  if (begin < 0 || end < 0 || end < begin) throw new Error("项目 MCP 文件中 dsh-workspace-mcp 受管块标记不完整（begin/end 必须成对）");
   const blockStart = raw.indexOf("\n", begin);
   if (blockStart < 0) throw new Error("项目 MCP 文件受管块格式损坏");
   const blockText = raw.slice(blockStart + 1, end);
@@ -118,7 +118,7 @@ export function replaceManagedBlock(raw: string, rows: PatchRow[]): string {
   const block = generateManagedBlock(rows);
 
   if (begin >= 0 || end >= 0) {
-    if (begin < 0 || end < 0 || end < begin) throw new Error("项目 MCP 文件中 dsh-project-mcp-manager 受管块标记不完整（begin/end 必须成对）");
+    if (begin < 0 || end < 0 || end < begin) throw new Error("项目 MCP 文件中 dsh-workspace-mcp 受管块标记不完整（begin/end 必须成对）");
     const lineStart = raw.lastIndexOf("\n", begin - 1) + 1;
     const afterEnd = raw.indexOf("\n", end);
     const lineEnd = afterEnd < 0 ? raw.length : afterEnd + 1;
@@ -146,7 +146,7 @@ export function replaceManagedBlock(raw: string, rows: PatchRow[]): string {
 
 /** 同目录临时文件 + rename 原子写；Windows 上 rename 覆盖失败时退化为 rm+rename。 */
 export async function writeFileAtomic(path: string, content: string): Promise<void> {
-  const temp = join(dirname(path), ".dsh-project-mcp-manager-tmp-" + process.pid + "-" + Math.random().toString(36).slice(2, 8));
+  const temp = join(dirname(path), ".dsh-workspace-mcp-tmp-" + process.pid + "-" + Math.random().toString(36).slice(2, 8));
   try {
     await writeFile(temp, content, "utf8");
     try {

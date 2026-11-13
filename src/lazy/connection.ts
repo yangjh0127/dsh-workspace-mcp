@@ -57,7 +57,7 @@ export class LazyServer {
         env: { ...scrubbedParentEnv(), ...config.env }
       })
       : new StreamableHTTPClientTransport(new URL(config.url), { requestInit: { headers: config.headers } });
-    const client = new Client({ name: "dsh-project-mcp-manager", version }, {
+    const client = new Client({ name: "dsh-workspace-mcp", version }, {
       versionNegotiation: { mode: "auto" },
       listChanged: { tools: { autoRefresh: false, debounceMs: 0, onChanged: () => {
         connection.catalog = undefined;

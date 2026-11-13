@@ -1,5 +1,5 @@
 /**
- * dsh-project-mcp-manager —— JSON 方言 MCP 配置读取器（严格只读）。
+ * dsh-workspace-mcp —— JSON 方言 MCP 配置读取器（严格只读）。
  *
  * 方言与生态一致：`{"mcpServers": { name: entry }}`（Cursor / Claude Code 通用写法）。
  * 读取位置与来源枚举：

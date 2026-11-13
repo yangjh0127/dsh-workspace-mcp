@@ -185,7 +185,7 @@ function fakeAgent(id, cwd) {
   };
 }
 
-const dir = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-registry-"));
+const dir = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-registry-"));
 
 // ── profile 名解析（纯函数，宿主内部路径形态）──────────────────────────────
 {
@@ -946,7 +946,7 @@ try {
     //（此前硬编码 homedir()/.dsh，重定位后用户层整体静默失效——缺文件是合法零配置，不报错）。
     {
       const savedHome = process.env.DSH_HOME;
-      const relocated = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-dshhome-"));
+      const relocated = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-dshhome-"));
       try {
         process.env.DSH_HOME = relocated;
         await writeFile(join(relocated, "mcp.json"), JSON.stringify({
@@ -988,7 +988,7 @@ try {
     //  a) 用户层 disabled 占名行 + 项目同名行 → 该项目不得 deny 自己的工具；
     //  b) 宿主 patch 占名 + 用户层同名行被拒（name-taken）+ 项目同名行 → 不得 deny 宿主 patch 的工具。
     {
-      const home32 = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-h1-"));
+      const home32 = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-h1-"));
       const proj32 = join(dir2, "proj32");
       try {
         await mkdir(proj32, { recursive: true });
@@ -1043,7 +1043,7 @@ try {
     // 33. 纯用户层内部冲突按全局归因（M3/M4）：零配置项目不写 .mcp-diag.json，
     // 同名/同服务遮蔽只在全局层告警一次并写全局诊断。
     {
-      const home33 = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-m4-"));
+      const home33 = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-m4-"));
       const proj33 = join(dir2, "proj33");
       try {
         await mkdir(proj33, { recursive: true });
@@ -1098,7 +1098,7 @@ try {
     // 34. 告警变更门控（M1/M2）：持续存在的坏条目与持续被拒的 name-taken 行，
     // 多次对账只在集合变化时各告警一次（此前每次文件事件都重刷）。
     {
-      const home34 = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-gate-"));
+      const home34 = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-gate-"));
       const proj34 = join(dir2, "proj34");
       try {
         await mkdir(join(proj34, ".dsh"), { recursive: true });
@@ -1149,7 +1149,7 @@ try {
     // 35. profile 名校验（M10）：DSH_MCP_PROFILE 是外部输入，`../..` 之类不得被
     // join 进 profiles 目录读到目录外的文件；不合法按「解析不出」降级并告警一次。
     {
-      const home35 = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-profile-"));
+      const home35 = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-profile-"));
       const proj35 = join(dir2, "proj35");
       try {
         await mkdir(proj35, { recursive: true });

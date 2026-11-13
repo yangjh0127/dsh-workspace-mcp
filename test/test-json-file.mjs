@@ -15,7 +15,7 @@ function pass(name) {
   console.log("PASS  " + name);
 }
 
-const dir = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-jsonfile-"));
+const dir = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-jsonfile-"));
 const write = async (name, text) => {
   const path = join(dir, name);
   await writeFile(path, text, "utf8");

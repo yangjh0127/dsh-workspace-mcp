@@ -60,7 +60,7 @@ pass("!!js outside the managed block is ignored by the read path");
 
 // 6. writeManagedRows 对含标记外 !!js 的文件仍可写回（validatePatchText 只查 parse errors），
 //    且标记外内容原样保留
-const dir = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-mcpfile-"));
+const dir = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-mcpfile-"));
 try {
   const path = join(dir, "mcp.yml");
   await writeFile(path, withOutsideJs, "utf8");

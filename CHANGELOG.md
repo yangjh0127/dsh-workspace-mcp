@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed the bundle to `dsh-workspace-mcp` and its companion package to
+  `dsh-workspace-mcp-ui`. Existing managed MCP configuration markers remain readable.
+
 ### Added
 
 - Per-server Lazy mode. The MCP Manager and project config support opt-in

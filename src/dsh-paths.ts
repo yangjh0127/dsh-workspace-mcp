@@ -1,5 +1,5 @@
 /**
- * dsh-project-mcp-manager —— dsh 家目录与用户层文件路径解析（单一真相）。
+ * dsh-workspace-mcp —— dsh 家目录与用户层文件路径解析（单一真相）。
  *
  * 宿主支持用 `DSH_HOME` 重定位 dsh 家目录（README.md / docs/README.zh.md：
  * 「dshHome 默认为 `%USERPROFILE%\.dsh`（设置了 `DSH_HOME` 则用其值）」，宿主进程

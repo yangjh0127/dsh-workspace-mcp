@@ -776,10 +776,10 @@ function ServerCard({ server, busy, locked, t, homeDir, onToggle, onRemove, onTo
 
 export function installPanelStyle(): void {
   if (typeof document === "undefined") return;
-  let tag = document.getElementById("dsh-project-mcp-ui");
+  let tag = document.getElementById("dsh-workspace-mcp-ui");
   if (tag === null) {
     tag = document.createElement("style");
-    tag.id = "dsh-project-mcp-ui";
+    tag.id = "dsh-workspace-mcp-ui";
     document.head.appendChild(tag);
   }
   if (tag.textContent !== PANEL_CSS) tag.textContent = PANEL_CSS;

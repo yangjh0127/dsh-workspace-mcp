@@ -2,13 +2,13 @@
 
 [English](CONTRIBUTING.md) | 中文
 
-感谢你帮助改进 `dsh-project-mcp-manager`。问题报告、文档修正和代码改动都欢迎。
+感谢你帮助改进 `dsh-workspace-mcp`。问题报告、文档修正和代码改动都欢迎。
 
 ## 开始之前
 
 - 小修复（错别字、文档、明显的 bug）可以直接提 PR。
 - 新功能、行为变更、新增依赖，或改动 `projectMcp` 服务面，请先开
-  [Issue](https://github.com/wldxiaobai/dsh-project-mcp-manager/issues) 讨论方案。
+  [Issue](https://github.com/yangjh0127/dsh-workspace-mcp/issues) 讨论方案。
 - 一个 PR 只做一件事。
 
 ## 开发环境

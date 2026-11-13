@@ -121,7 +121,7 @@ importers:
       chokidar:
         specifier: ^5.0.0
         version: 5.0.0
-      dsh-project-mcp-ui:
+      dsh-workspace-mcp-ui:
         specifier: workspace:0.12.0
         version: link:packages/ui
       yaml:
@@ -186,7 +186,7 @@ importers:
       '@types/react':
         specifier: ~18.3.1
         version: 18.3.31
-      dsh-project-mcp-manager:
+      dsh-workspace-mcp:
         specifier: workspace:0.12.0
         version: link:../..
       esbuild:

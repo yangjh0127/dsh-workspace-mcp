@@ -4,8 +4,8 @@ English | [中文](settings-ui.zh.md)
 
 [← README](../../README.md) ｜ Related: [configuration sources and layers](layers.md) · [configuration format](format.md) · [`${VAR}` expansion](env-expansion.md) · [Lazy mode design record (Chinese)](../design/lazy-mcp.md)
 
-The companion package `dsh-project-mcp-ui`, included in the default
-`dsh-project-mcp-manager` bundle, adds an **MCP Manager** page with three entries —
+The companion package `dsh-workspace-mcp-ui`, included in the default
+`dsh-workspace-mcp` bundle, adds an **MCP Manager** page with three entries —
 main sidebar, settings sidebar, and a Built-in plugins settings tab. It lists the servers
 the loader will run, shows whether each one is running, and lets you add,
 switch, and remove servers; choose a per-server loading mode; or manage single
@@ -16,18 +16,18 @@ and the [CLI](cli.md) can be used side by side.
 
 ## Install
 
-Install **only the manager** into the profile you use:
+Build the checkout using the [README](../../README.md#install), then link **only the manager** into the profile you use:
 
 ```powershell
-dsh plugin --profile web add dsh-project-mcp-manager@latest
-dsh plugin --profile desktop add dsh-project-mcp-manager@latest
+dsh plugin --profile web add "link:$((Get-Location).Path -replace '\\','/')"
+dsh plugin --profile desktop add "link:$((Get-Location).Path -replace '\\','/')"
 ```
 
 The plugin is mounted through a **bundle patch**: once the package is in
 `dsh.profile.bundles`, dsh turns each bundle's patch (the `cordis.patch.yml`
 pointed to by `dsh.bundle.patch`) into plugin rows at startup, in order.
 
-The manager depends on `dsh-project-mcp-ui` at the **same exact version**, so
+The manager depends on `dsh-workspace-mcp-ui` at the **same exact version**, so
 the UI is installed automatically. Its default bundle contains `mcp-project`
 (core) and `mcp-project-ui` (UI), both enabled. The UI package keeps its exact
 manager peer dependency but no longer declares a standalone `dsh.bundle`;
@@ -55,11 +55,16 @@ not the core loader or MCP mounting. The UI row can be active independently.
 Connection arrival registers that integration, and connection disposal cleans
 it up.
 
+### Migrating from the old package names
+
+After linking `dsh-workspace-mcp`, remove the old manager from the same profile
+with `dsh plugin --profile web remove dsh-project-mcp-manager` before restarting DSH.
+
 ### Migrating from a separately installed UI
 
 1. Install or upgrade the manager bundle first.
 2. Remove `dsh-project-mcp-ui` from the profile's bundle selection
-   (`dsh.profile.bundles`), keeping `dsh-project-mcp-manager` selected. The
+   (`dsh.profile.bundles`), keeping `dsh-workspace-mcp` selected. The
    manager now supplies the UI row; selecting the old UI bundle as well is not
    part of this layout.
 3. Optionally remove the old **direct** UI dependency after step 1:
@@ -69,11 +74,7 @@ it up.
    # Or use --profile desktop for the desktop profile
    ```
 
-   The UI remains installed through the manager's dependency. An old direct
-   UI version can take precedence over the transitive package resolution:
-   remove it (recommended), or align it to the manager's exact version,
-   **before running the new bundle**. Do not assume either the old selection
-   or direct dependency is cleaned up automatically.
+   The new UI remains installed through the manager's dependency.
 
 If the old standalone UI bundle was disabled, preserve that intent **before
 loading the new manager bundle** with this profile patch row override:
@@ -118,7 +119,7 @@ changes; **Cancel** discards them. Changes made in another browser sync in too.
   when both sides changed one field, the choice you just confirmed wins.
 - You can turn off all three entries. The General row is not one of them and
   always stays, so you can turn entries back on.
-- The same row is on the main sidebar's **Plugins → `dsh-project-mcp-manager`**
+- The same row is on the main sidebar's **Plugins → `dsh-workspace-mcp`**
   page, and both places change the same setting. That page's README follows
   the UI language: Chinese shows `docs/README.zh.md`, other languages show the
   root `README.md`.

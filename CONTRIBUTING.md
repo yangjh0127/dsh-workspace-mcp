@@ -2,7 +2,7 @@
 
 English | [中文](CONTRIBUTING.zh.md)
 
-Thanks for helping improve `dsh-project-mcp-manager`. Bug reports, docs fixes,
+Thanks for helping improve `dsh-workspace-mcp`. Bug reports, docs fixes,
 and code changes are all welcome.
 
 ## Before you start
@@ -10,7 +10,7 @@ and code changes are all welcome.
 - Small fixes (typos, docs, obvious bugs) can go straight to a pull request.
 - For new features, behavior changes, new dependencies, or changes to the
   `projectMcp` service surface, open an
-  [issue](https://github.com/wldxiaobai/dsh-project-mcp-manager/issues) first so
+  [issue](https://github.com/yangjh0127/dsh-workspace-mcp/issues) first so
   we can agree on the approach.
 - Keep one topic per pull request.
 

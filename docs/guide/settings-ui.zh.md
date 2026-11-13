@@ -4,7 +4,7 @@
 
 [← 返回 README](../README.zh.md) ｜ 相关：[配置来源与分层](layers.zh.md) · [配置格式](format.zh.md) · [`${VAR}` 展开](env-expansion.zh.md) · [Lazy 设计记录](../design/lazy-mcp.md)
 
-默认 `dsh-project-mcp-manager` bundle 内的配套包 `dsh-project-mcp-ui` 在 dsh
+默认 `dsh-workspace-mcp` bundle 内的配套包 `dsh-workspace-mcp-ui` 在 dsh
 web 端与桌面端加一个 **MCP 管理** 页面，主页左侧栏、设置页左侧栏和设置里的插件
 标签页各有一个入口：列出装载器会启动的服务器、显示每台是否在运行，并可以添加、
 开关、删除服务器，选择每台服务器的加载模式，或管理单个工具。所有改动都写进
@@ -13,23 +13,21 @@ web 端与桌面端加一个 **MCP 管理** 页面，主页左侧栏、设置页
 
 ## 安装
 
-只需安装你所用 profile 的 **manager**：
+按[中文 README](../README.zh.md) 构建后，只需在所用 profile 中链接 **manager**：
 
 ```powershell
-dsh plugin --profile web add dsh-project-mcp-manager@latest
-dsh plugin --profile desktop add dsh-project-mcp-manager@latest
+dsh plugin --profile web add "link:$((Get-Location).Path -replace '\\','/')"
+dsh plugin --profile desktop add "link:$((Get-Location).Path -replace '\\','/')"
 ```
 
 插件通过 **bundle patch** 挂载：把包加入 `dsh.profile.bundles` 后，dsh 启动时
 按顺序把每个 bundle 的 patch（`dsh.bundle.patch` 指向的 `cordis.patch.yml`）合成
 为插件行。
 
-manager 以**同一精确版本**依赖 `dsh-project-mcp-ui`，会自动安装 UI。默认 bundle
+manager 以**同一精确版本**依赖 `dsh-workspace-mcp-ui`，会自动安装 UI。默认 bundle
 包含 `mcp-project`（核心）与 `mcp-project-ui`（UI）两行，均默认启用。UI 保留
 精确版本的 manager peer dependency，但不再单独声明 `dsh.bundle`，不要另选 UI
 bundle。两个包必须同步发布（[版本契约](service.zh.md#对配套-ui-的语义化版本)）。
-这个布局已纳入源码版本 **0.8.0**；npm 示例在两个 0.8.0 包同步发布后适用。
-Git 标签不会自动发布 npm。
 
 本地开发时，在源码仓库内执行以下命令，只链接根 manager 包：
 
@@ -47,11 +45,16 @@ headless profile 可以使用同一个 manager bundle。没有浏览器运行时
 不阻塞核心装载器与 MCP 装载，UI 行本身可以独立处于 active。connection 到来时
 注册对应集成，销毁时清理。
 
+### 从旧包名迁移
+
+链接 `dsh-workspace-mcp` 后，在重启 DSH 前运行
+`dsh plugin --profile web remove dsh-project-mcp-manager`，从同一 profile 移除旧包。
+
 ### 从单独安装的 UI 迁移
 
 1. 先安装或升级 manager bundle。
 2. 从 profile 的 bundle 选择（`dsh.profile.bundles`）中移除
-   `dsh-project-mcp-ui`，保留 `dsh-project-mcp-manager`。现在由 manager 提供 UI
+   `dsh-project-mcp-ui`，保留 `dsh-workspace-mcp`。现在由 manager 提供 UI
    行，不应继续另选旧的 UI bundle。
 3. 完成第 1 步后，可以选择移除旧的**直接** UI 依赖：
 
@@ -60,9 +63,7 @@ headless profile 可以使用同一个 manager bundle。没有浏览器运行时
    # 桌面端换成 --profile desktop
    ```
 
-   UI 仍通过 manager 的依赖安装。旧的直接 UI 版本可能优先于传递依赖解析：
-   **运行新 bundle 之前**，建议移除旧直接依赖，或将它对齐到 manager 的精确版本。
-   不要假定旧 bundle 选择或直接依赖会自动清理。
+   新 UI 仍通过 manager 的依赖安装。
 
 如果旧的独立 UI bundle 曾被禁用，请在**加载新 manager bundle 之前**，用下面的
 profile patch 行覆盖保留停用意图：
@@ -101,7 +102,7 @@ profile patch 行覆盖保留停用意图：
   以你这次确认的勾选为准。
 - 三个入口可以全部关掉。通用里的这一行不受这三个开关影响，始终保留，用来重新
   打开入口。
-- 主页左侧栏 **插件 → `dsh-project-mcp-manager`** 页面里也有同一行，两处改的是
+- 主页左侧栏 **插件 → `dsh-workspace-mcp`** 页面里也有同一行，两处改的是
   同一份设置。这个页面显示的 README 跟随界面语言：中文显示 `docs/README.zh.md`，
   其它语言显示根目录 `README.md`。
 - 页面没有修改权限时（例如远程浏览器），勾选框禁用并给出说明。

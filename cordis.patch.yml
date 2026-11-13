@@ -1,4 +1,4 @@
-# dsh-project-mcp-manager bundle patch.
+# dsh-workspace-mcp bundle patch.
 # When this package is installed with `dsh plugin --profile <name> add ...`,
 # the profile auto-appends it to dsh.profile.bundles and applies this layer,
 # so the plugin mounts without any manual cordis.patch.yml editing.
@@ -7,6 +7,6 @@
 # the UI's nested integration stays idle; both bundle rows can remain active.
 - insert:
     - id: mcp-project
-      name: dsh-project-mcp-manager
+      name: dsh-workspace-mcp
     - id: mcp-project-ui
-      name: dsh-project-mcp-ui
+      name: dsh-workspace-mcp-ui

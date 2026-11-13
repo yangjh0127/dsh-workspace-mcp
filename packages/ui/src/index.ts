@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 import type { Context } from "@deepseek-ai/cordis";
 import { openNativeTextFile } from "@deepseek-ai/dsh-native-command";
 import Schema from "@deepseek-ai/schemastery";
-import { projectKeyOf, serviceIdentityKeyOf, type McpRowSource, type ProjectFileState } from "dsh-project-mcp-manager";
+import { projectKeyOf, serviceIdentityKeyOf, type McpRowSource, type ProjectFileState } from "dsh-workspace-mcp";
 import {
   MCP_UI_ADD_PATH,
   MCP_UI_OPEN_PATH,
@@ -24,7 +24,7 @@ import {
   type McpUiState
 } from "./wire.js";
 
-export const name = "dsh-project-mcp-ui";
+export const name = "dsh-workspace-mcp-ui";
 /** projectMcp 是硬依赖；connection 在子作用域里等待，headless 下 UI 行仍可 active。 */
 export const inject = ["projectMcp"];
 
@@ -200,7 +200,7 @@ function applyConnected(ctx: Context) {
   const unsubscribe = mcp.subscribeUpdated(() => {
     revision += 1;
   });
-  ctx.effect(() => unsubscribe, "dsh-project-mcp-ui: unsubscribe");
+  ctx.effect(() => unsubscribe, "dsh-workspace-mcp-ui: unsubscribe");
 
   const connection = connectionOf(ctx);
   if (connection === undefined) {
@@ -334,19 +334,19 @@ function applyConnected(ctx: Context) {
   ];
 
   for (const route of routes) {
-    ctx.effect(() => connection.fetch.register({ path: route.path, methods: route.methods, requestBody: "buffered", fetch: guarded(route.fetch) }), `dsh-project-mcp-ui: ${route.path}`);
+    ctx.effect(() => connection.fetch.register({ path: route.path, methods: route.methods, requestBody: "buffered", fetch: guarded(route.fetch) }), `dsh-workspace-mcp-ui: ${route.path}`);
   }
   const events: EventStreamScope = { disposed: false, streams: new Set() };
   ctx.effect(() => () => {
     events.disposed = true;
     for (const close of events.streams) close();
-  }, "dsh-project-mcp-ui: close event streams");
+  }, "dsh-workspace-mcp-ui: close event streams");
   ctx.effect(() => connection.fetch.register({
     path: MCP_UI_EVENTS_PATH,
     methods: ["GET"],
     requestBody: "buffered",
     fetch: (request) => Promise.resolve(eventStream(request, mcp, events))
-  }), "dsh-project-mcp-ui: events");
+  }), "dsh-workspace-mcp-ui: events");
 }
 
 /**

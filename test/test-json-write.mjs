@@ -23,7 +23,7 @@ async function exists(path) {
   }
 }
 
-const dir = await mkdtemp(join(tmpdir(), "dsh-project-mcp-manager-jsonwrite-"));
+const dir = await mkdtemp(join(tmpdir(), "dsh-workspace-mcp-jsonwrite-"));
 const target = join(dir, "mcp.json");
 
 try {

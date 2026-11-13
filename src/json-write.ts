@@ -1,5 +1,5 @@
 /**
- * dsh-project-mcp-manager —— DSH JSON 配置写入器（仅 `dsh-mcp` CLI 使用）。
+ * dsh-workspace-mcp —— DSH JSON 配置写入器（仅 `dsh-mcp` CLI 使用）。
  *
  * 契约（"CLI 独占整个文件"）：
  *  - 只认 `mcpServers` 键；其余顶层键原样保留（语义保真，排版归一化）；

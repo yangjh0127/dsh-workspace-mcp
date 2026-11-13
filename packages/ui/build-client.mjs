@@ -1,7 +1,7 @@
 import * as esbuild from "esbuild";
 import { writeFileSync } from "node:fs";
 
-const id = "dsh-project-mcp-ui";
+const id = "dsh-workspace-mcp-ui";
 const result = await esbuild.build({
   entryPoints: ["src/client/index.ts"],
   bundle: true,

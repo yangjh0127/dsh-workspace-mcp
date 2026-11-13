@@ -48,7 +48,7 @@ export function apply(ctx: Context): void {
     configForms: ConfigFormsService;
   };
   const { locale, slots, layout, configForms } = services;
-  ctx.effect(() => locale.register(NS, { zh, en }), "dsh-project-mcp-ui: dictionaries");
+  ctx.effect(() => locale.register(NS, { zh, en }), "dsh-workspace-mcp-ui: dictionaries");
   const t = locale.bind(NS);
 
   const form = configForms.get(ENTRY_CONFIG_ID);
@@ -104,9 +104,9 @@ export function apply(ctx: Context): void {
   controller.apply(entryFlagsFromSnapshot(form.getSnapshot()));
   ctx.effect(
     () => form.subscribe(() => controller.apply(entryFlagsFromSnapshot(form.getSnapshot()))),
-    "dsh-project-mcp-ui: entry visibility"
+    "dsh-workspace-mcp-ui: entry visibility"
   );
-  ctx.effect(() => () => controller.dispose(), "dsh-project-mcp-ui: entry registrations");
+  ctx.effect(() => () => controller.dispose(), "dsh-workspace-mcp-ui: entry registrations");
 
   // The General row always exists, whatever the three checkboxes say: it is the
   // only way to bring a hidden entry back from inside the page.

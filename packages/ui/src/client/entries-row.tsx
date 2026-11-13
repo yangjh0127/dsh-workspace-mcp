@@ -131,7 +131,7 @@ export function McpEntriesRow({ t, useEntries, save, variant = "settings" }: Mcp
   );
 }
 
-/** 插件管理页 → dsh-project-mcp-manager 页面里的同一行，去掉通用行的分隔线与内边距。 */
+/** 插件管理页 → dsh-workspace-mcp 页面里的同一行，去掉通用行的分隔线与内边距。 */
 export function McpPluginEntriesRow(props: McpEntriesRowProps) {
   return <McpEntriesRow {...props} variant="page" />;
 }

@@ -1,5 +1,5 @@
 /**
- * dsh-project-mcp-manager —— MCP 行运行时状态读取（工具计数与预算）。
+ * dsh-workspace-mcp —— MCP 行运行时状态读取（工具计数与预算）。
  */
 export const TOOL_BUDGET_WARN_ENV = "DSH_MCP_TOOL_BUDGET_WARN";
 export const DEFAULT_TOOL_BUDGET_COUNT = 200;

@@ -185,7 +185,7 @@ test("registrations carry the documented slots, keys, orders and inject faces", 
   const face = reg.generalRow.inject();
   assert.equal(face.hooks.entries, form, "the row subscribes to the entry config form");
   assert.equal(face.save, save, "the row writes through the one submit command");
-  assert.equal(MANAGER_BUNDLE, "dsh-project-mcp-manager");
+  assert.equal(MANAGER_BUNDLE, "dsh-workspace-mcp");
   assert.deepEqual([reg.pluginEntries.name, reg.pluginEntries.key, reg.pluginEntries.locale], ["plugins.bundle.config", MANAGER_BUNDLE, NS]);
   const pluginFace = reg.pluginEntries.inject();
   assert.equal(pluginFace.hooks.entries, form, "the plugin page row subscribes to the same form");

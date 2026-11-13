@@ -99,7 +99,7 @@ import {
   type ProjectServerState,
   type ReconnectConfig,
   type ToolFilter,
-} from "dsh-project-mcp-manager";
+} from "dsh-workspace-mcp";
 ```
 
 `snapshot()` 的元素类型是 `ProjectFileState`。每一行是 `McpServerRuntimeView`
@@ -124,7 +124,7 @@ import {
 UI。包含这些改动的两个包必须一起升版、一起发布，不能只升其中一个。本次源码改动不改
 版本号；发版时再按 minor 一起提升两个包。
 
-manager 以**同一精确版本**的运行时 dependency 依赖 `dsh-project-mcp-ui`；UI
+manager 以**同一精确版本**的运行时 dependency 依赖 `dsh-workspace-mcp-ui`；UI
 保留同一精确版本的 manager peer dependency。发布后的两份契约都不用 `^` 或
 `~`，两个包必须同步升版、同步发布。用户只安装 manager，它的默认 bundle 负责
 核心与 UI 两行；UI 不再单独声明 `dsh.bundle`（[安装与迁移](settings-ui.zh.md#安装)）。
@@ -134,7 +134,7 @@ manager 发布后的依赖契约：
 ```json
 {
   "dependencies": {
-    "dsh-project-mcp-ui": "<本包的精确版本>"
+    "dsh-workspace-mcp-ui": "<本包的精确版本>"
   }
 }
 ```
@@ -144,7 +144,7 @@ UI 配套的 peer 契约：
 ```json
 {
   "peerDependencies": {
-    "dsh-project-mcp-manager": "<本包的精确版本>"
+    "dsh-workspace-mcp": "<本包的精确版本>"
   }
 }
 ```

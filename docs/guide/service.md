@@ -115,7 +115,7 @@ import {
   type ProjectServerState,
   type ReconnectConfig,
   type ToolFilter,
-} from "dsh-project-mcp-manager";
+} from "dsh-workspace-mcp";
 ```
 
 `ProjectFileState` is what `snapshot()` returns. Each row is an
@@ -143,7 +143,7 @@ with the new UI. Both packages must be bumped and released together, never one
 alone. This source change does not bump the version; the release step performs
 the minor bump for both packages.
 
-The manager lists `dsh-project-mcp-ui` as a runtime dependency pinned to the
+The manager lists `dsh-workspace-mcp-ui` as a runtime dependency pinned to the
 **same exact version**. The UI keeps this package as a peer dependency at that
 exact version. Neither published contract uses `^` or `~`; both packages must
 be versioned and released together. Users install only the manager, whose
@@ -155,7 +155,7 @@ The manager's published dependency contract is:
 ```json
 {
   "dependencies": {
-    "dsh-project-mcp-ui": "<exact version of this package>"
+    "dsh-workspace-mcp-ui": "<exact version of this package>"
   }
 }
 ```
@@ -165,7 +165,7 @@ The UI's matching peer contract is:
 ```json
 {
   "peerDependencies": {
-    "dsh-project-mcp-manager": "<exact version of this package>"
+    "dsh-workspace-mcp": "<exact version of this package>"
   }
 }
 ```
