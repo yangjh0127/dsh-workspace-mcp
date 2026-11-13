@@ -61,7 +61,7 @@ mcpServers:
 
 {
   const parsed = parsePastedConfig(`
-# >>> dsh-project-mcp-manager:mcp:begin
+# >>> dsh-workspace-mcp:mcp:begin
 - insert:
     - id: panel-mcp-godot
       name: '@deepseek-ai/dsh-mcp-client'
@@ -70,7 +70,7 @@ mcpServers:
         transport: stdio
         command: godot
         args: ["--mcp"]
-# <<< dsh-project-mcp-manager:mcp:end
+# <<< dsh-workspace-mcp:mcp:end
 `);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.fields.name, "godot");

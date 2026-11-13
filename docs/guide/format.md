@@ -82,7 +82,7 @@ Uses the same managed-block format as the profile `cordis.patch.yml` (a YAML
 `insert` list between begin/end markers), with one MCP server per line:
 
 ```yaml
-# >>> dsh-project-mcp-manager:mcp:begin
+# >>> dsh-workspace-mcp:mcp:begin
 - insert:
     - id: panel-mcp-gitlab
       name: '@deepseek-ai/dsh-mcp-client'
@@ -99,7 +99,7 @@ Uses the same managed-block format as the profile `cordis.patch.yml` (a YAML
           initialDelayMs: 500
           maxDelayMs: 30000
           maxAttempts: 10
-# <<< dsh-project-mcp-manager:mcp:end
+# <<< dsh-workspace-mcp:mcp:end
 ```
 
 `transport` supports `stdio` (command/args/env/cwd) and `streamable-http`

@@ -69,7 +69,7 @@ Lazy 沿用行级 `tools.allow` / `deny`：规则在搜索、描述和调用之�
 insert 列表），每行一个 MCP 服务器：
 
 ```yaml
-# >>> dsh-project-mcp-manager:mcp:begin
+# >>> dsh-workspace-mcp:mcp:begin
 - insert:
     - id: panel-mcp-gitlab
       name: '@deepseek-ai/dsh-mcp-client'
@@ -86,7 +86,7 @@ insert 列表），每行一个 MCP 服务器：
           initialDelayMs: 500
           maxDelayMs: 30000
           maxAttempts: 10
-# <<< dsh-project-mcp-manager:mcp:end
+# <<< dsh-workspace-mcp:mcp:end
 ```
 
 `transport` 支持 `stdio`（command/args/env/cwd）与 `streamable-http`

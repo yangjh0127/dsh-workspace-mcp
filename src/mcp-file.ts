@@ -6,15 +6,15 @@
  * 本插件只读写 begin/end 标记之间的行，标记之外的内容逐字节保留。
  * 写入使用同目录临时文件 + rename，并通过锁文件避免并发写。
  *
- * 沿用旧包名的受管块标记以兼容已有配置，与 dsh-skill-mcp-panel 的标记不同，
+ * 受管块使用 dsh-workspace-mcp 标记，与 dsh-skill-mcp-panel 的标记不同，
  * 但行 id 前缀兼容 panel 的 `panel-mcp-`，v2.1 面板写出的项目文件可直接读取。
  */
 import { open, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { parseDocument, stringify } from "yaml";
 
-export const MCP_BLOCK_BEGIN = "# >>> dsh-project-mcp-manager:mcp:begin";
-export const MCP_BLOCK_END = "# <<< dsh-project-mcp-manager:mcp:end";
+export const MCP_BLOCK_BEGIN = "# >>> dsh-workspace-mcp:mcp:begin";
+export const MCP_BLOCK_END = "# <<< dsh-workspace-mcp:mcp:end";
 export const MCP_PLUGIN_NAME = "@deepseek-ai/dsh-mcp-client";
 /** 兼容 dsh-skill-mcp-panel 的受管行 id 前缀（其项目文件行可直接装载）。 */
 export const MANAGED_ROW_ID_PREFIX = "panel-mcp-";

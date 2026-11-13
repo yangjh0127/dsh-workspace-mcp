@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Renamed the bundle to `dsh-workspace-mcp` and its companion package to
-  `dsh-workspace-mcp-ui`. Existing managed MCP configuration markers remain readable.
+  `dsh-workspace-mcp-ui`. Managed MCP blocks now use the new name in both markers.
 
 ### Added
 
@@ -1117,7 +1117,7 @@ carry an explicit `type`.
   `<projectRoot>/.dsh/mcp.yml` are mounted automatically whenever a dsh session opens
   in that project — no UI, core functionality only.
 - Managed-block configuration reader (`src/mcp-file.ts`): a YAML `insert` list between
-  `# >>> dsh-project-mcp-manager:mcp:begin` / `# <<< ...:mcp:end` markers, one MCP server
+  `# >>> dsh-workspace-mcp:mcp:begin` / `# <<< ...:mcp:end` markers, one MCP server
   per line, with content outside the markers preserved byte-for-byte.
 - Configuration model and validation (`src/model.ts`, zod schemas) for `stdio`
   (command/args/env/cwd) and `streamable-http` (url/headers) transports, plus
