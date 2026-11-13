@@ -11,8 +11,10 @@ DSH Workspace MCP 从工作区配置加载 MCP 服务器，并按会话所属的
 从 GitHub 安装。pnpm 下载源码，并一起构建装载器和 MCP 管理页。
 
 ```powershell
-dsh plugin --profile web add github:yangjh0127/dsh-workspace-mcp#main --allow-build=dsh-workspace-mcp
+dsh plugin --profile web add github:yangjh0127/dsh-workspace-mcp#main
 ```
+
+如果 pnpm 阻止构建，把报错中给出的完整键添加到对应 profile 的 `pnpm-workspace.yaml` 中的 `allowBuilds`，然后重试。
 
 按实际使用的 profile 选择 `web` 或 `desktop`，安装后重启 DSH。更新时重新运行安装命令，再重启 DSH。
 本地开发可参照[链接源码目录](guide/settings-ui.zh.md#安装)。
